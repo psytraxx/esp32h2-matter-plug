@@ -108,56 +108,13 @@ rather than sharing a connector. Constraints applied:
   the XIAO's MTMS/MTDI/Boot/Light pads — none used by this design), so none
   of the choices above affect boot behaviour.
 
-```mermaid
-flowchart LR
-    subgraph CB2S["CB2S footprint (11 castellated pads)"]
-        direction TB
-        C_CEN["CEN"]
-        C_ADC["ADC"]
-        C_P8["P8 · WiFi LED"]
-        C_P7["P7 · CF"]
-        C_P6["P6 · CF1"]
-        C_3V3["3V3"]
-        C_GND["GND"]
-        C_RX1["RX1 · button (P10)"]
-        C_TX1["TX1"]
-        C_P24["P24 · SEL"]
-        C_P26["P26 · relay"]
-    end
+![Wiring: plug board net to CB2S pad to XIAO pad, with an arrow on each row showing which direction the signal flows](doc/wiring.svg)
 
-    subgraph XIAO["XIAO ESP32-C6"]
-        direction TB
-        X_3V3["3V3"]
-        X_GND["GND"]
-        X_D0["D0 (GPIO0)"]
-        X_D1["D1 (GPIO1)"]
-        X_D2["D2 (GPIO2)"]
-        X_D3["D3 (GPIO21)"]
-        X_D4["D4 (GPIO22)"]
-        X_D5["D5 (GPIO23)"]
-    end
-
-    C_3V3 -.->|"AMS1117 3V3 -> XIAO 3V3 (back-feed)"| X_3V3
-    C_GND ---|ground| X_GND
-    C_P7 -->|"CF pulses -> XIAO"| X_D0
-    C_P6 -->|"CF1 pulses -> XIAO"| X_D1
-    X_D2 -->|"XIAO drives SEL"| C_P24
-    C_RX1 -->|"button -> XIAO"| X_D3
-    X_D4 -->|"XIAO drives LED"| C_P8
-    X_D5 -->|"XIAO drives relay"| C_P26
-
-    C_CEN -.not connected.- C_CEN
-    C_ADC -.not connected.- C_ADC
-    C_TX1 -.not connected.- C_TX1
-
-    classDef nc fill:#eee,stroke:#999,color:#999
-    class C_CEN,C_ADC,C_TX1 nc
-```
-
-Legend: each `-->` points in the direction the signal actually flows —
-plug-board-to-XIAO for `CF`, `CF1`, and the button (the XIAO reads them),
-XIAO-to-plug-board for `SEL`, LED, and relay (the XIAO drives them); `---` =
-common ground; dotted = power feed or not-connected.
+Each arrow points in the direction the signal actually flows: into the XIAO
+for `CF`, `CF1`, and the button (the XIAO reads them), out of the XIAO for
+`SEL`, the LED, and the relay (the XIAO drives them). Plain lines with no
+arrowhead are power/ground; dotted grey rows are the three footprint pads
+this design leaves unconnected.
 
 ### Bench verification checklist
 
