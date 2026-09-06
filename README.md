@@ -141,10 +141,10 @@ flowchart LR
     C_GND ---|ground| X_GND
     C_P7 -->|"CF pulses -> XIAO"| X_D0
     C_P6 -->|"CF1 pulses -> XIAO"| X_D1
-    C_P24 <--|"XIAO drives SEL"| X_D2
+    X_D2 -->|"XIAO drives SEL"| C_P24
     C_RX1 -->|"button -> XIAO"| X_D3
-    C_P8 <--|"XIAO drives LED"| X_D4
-    C_P26 <--|"XIAO drives relay"| X_D5
+    X_D4 -->|"XIAO drives LED"| C_P8
+    X_D5 -->|"XIAO drives relay"| C_P26
 
     C_CEN -.not connected.- C_CEN
     C_ADC -.not connected.- C_ADC
@@ -154,10 +154,10 @@ flowchart LR
     class C_CEN,C_ADC,C_TX1 nc
 ```
 
-Legend: `-->` = signal flows from the plug board into the XIAO (the XIAO
-reads it — `CF`, `CF1`, button); `<--` = signal flows from the XIAO into the
-plug board (the XIAO drives it — `SEL`, LED, relay); `---` = common ground;
-dotted = power feed or not-connected.
+Legend: each `-->` points in the direction the signal actually flows —
+plug-board-to-XIAO for `CF`, `CF1`, and the button (the XIAO reads them),
+XIAO-to-plug-board for `SEL`, LED, and relay (the XIAO drives them); `---` =
+common ground; dotted = power feed or not-connected.
 
 ### Bench verification checklist
 
