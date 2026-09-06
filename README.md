@@ -1,10 +1,21 @@
-# CB2S Smart Plug — Reverse Engineering Notes
+# CB2S Smart Plug — Matter Conversion
 
-Findings from analysing a Tuya-based energy-metering smart plug built around a
-**CB2S** module (Beken **BK7231N**, Cortex-M4F @ 120 MHz, 256 KB SRAM, 2 MB SPI flash).
+Converting a Tuya-based energy-metering smart plug — built around a **CB2S**
+module (Beken **BK7231N**, Cortex-M4F @ 120 MHz, 256 KB SRAM, 2 MB SPI flash)
+— into a fully Matter-controlled plug: the stock module is replaced with a
+**Seeed Studio XIAO ESP32-C6**, and the plug's relay, button, and BL0937
+energy meter are kept and driven by new firmware speaking **Matter over
+Thread**, including live power/energy reporting.
 
-Goal: document the measured hardware mapping and calibration details for a custom
-Matter-over-WiFi build.
+This repo carries both halves of that conversion:
+
+- **Reverse-engineering notes** (below, and `doc/`) — the measured hardware
+  mapping and BL0937 calibration details recovered from the stock device,
+  which the new firmware and wiring depend on.
+- **The replacement firmware** (`main/`, ESP-IDF + esp_matter) — see
+  [CLAUDE.md](CLAUDE.md) for its architecture and build instructions, and the
+  [Wiring](#wiring--replacing-the-cb2s-with-a-xiao-esp32-c6) section below for
+  how the XIAO is wired into the vacated CB2S footprint.
 
 ---
 
@@ -45,9 +56,9 @@ This is the measured hardware wiring and should be treated as the authoritative 
 
 ## Wiring — replacing the CB2S with a XIAO ESP32-C6
 
-This repo now also carries a Matter firmware (`main/`) targeting a **Seeed Studio
-XIAO ESP32-C6**, wired into the vacated CB2S footprint after the CB2S module is
-desoldered. See [CLAUDE.md](CLAUDE.md) for the firmware build/flash workflow.
+The CB2S module is desoldered and a **Seeed Studio XIAO ESP32-C6** is wired
+into the pads it vacated, becoming the plug's new brain over Matter/Thread.
+See [CLAUDE.md](CLAUDE.md) for the firmware's build/flash workflow.
 
 > **⚠️ Mains safety.** This plug's low-voltage section is **not isolated from
 > mains** — the BL0937's ground sits at mains potential, so every pad on the
