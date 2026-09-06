@@ -297,6 +297,41 @@ EOF
 
 ---
 
+## Future work — two firmware flavours from one codebase
+
+The firmware should eventually build in two variants:
+
+- **C6 / metering** — XIAO ESP32-C6, On/Off plus `ElectricalPowerMeasurement`
+  and `ElectricalEnergyMeasurement`, BL0937 driver. (What `main/` targets today.)
+- **H2 / switch-only** — XIAO ESP32-H2, On/Off only, no BL0937, no
+  Electrical\*Measurement clusters. For CB2S-footprint plugs with no metering
+  front end (e.g. the `smartswitch10a` / `lspa10` layouts above).
+
+Recommended structure — one `main/`, build-time variant selection, not
+branches or a second repo (the On/Off path, commissioning, button/LED/relay
+and the Thread stack are ~90% shared; the metering code is already isolated
+in `power_measurement.cpp` / `bl0937.cpp`):
+
+1. **Own Kconfig feature flag**, not raw `CONFIG_IDF_TARGET_*` checks:
+   `PLUG_ENERGY_METERING` in `main/Kconfig.projbuild`, `default y if
+   IDF_TARGET_ESP32C6`. Gate the cluster `create()` calls in
+   `matter_setup.cpp` and the source-file list in `main/CMakeLists.txt` on it.
+2. **Per-target sdkconfig**: keep shared bits in `sdkconfig.defaults`; add
+   `sdkconfig.defaults.esp32c6` and `sdkconfig.defaults.esp32h2` (H2 has no
+   Wi-Fi — radio co-ex off, `PLUG_ENERGY_METERING=n`). `idf.py set-target`
+   picks the matching file up automatically.
+3. **Distinct factory identity per flavour** — separate VID/PID/discriminator
+   and pairing code (`tools/spake2p_verifier.py` run once per passcode),
+   driven from the per-target sdkconfig or Kconfig.
+4. **Build wrapper + separate build dirs** (`idf.py -B build/esp32h2 …`) so
+   switching target doesn't force a full reconfigure in a shared dir.
+
+Compile-time (not runtime) selection is deliberate: H2 physically lacks
+Wi-Fi, the BL0937 GPIO/ISR code shouldn't link on a board with no BL0937,
+and dropping it shrinks the H2 image.
+
+---
+
 ## References
 
 - [LibreTiny — Beken BK72xx](https://docs.libretiny.eu/docs/platform/beken-72xx/)
