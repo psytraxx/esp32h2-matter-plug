@@ -43,6 +43,148 @@ This is the measured hardware wiring and should be treated as the authoritative 
 
 ---
 
+## Wiring — replacing the CB2S with a XIAO ESP32-C6
+
+This repo now also carries a Matter firmware (`main/`) targeting a **Seeed Studio
+XIAO ESP32-C6**, wired into the vacated CB2S footprint after the CB2S module is
+desoldered. See [CLAUDE.md](CLAUDE.md) for the firmware build/flash workflow.
+
+> **⚠️ Mains safety.** This plug's low-voltage section is **not isolated from
+> mains** — the BL0937's ground sits at mains potential, so every pad on the
+> CB2S footprint can be live. Never connect USB to the XIAO while the plug is
+> connected to mains, and never probe or rework the board while it is plugged
+> in. Use an isolation transformer for any bring-up that needs mains present,
+> and discharge the bulk capacitor before handling the board.
+
+**Not a drop-in.** The CB2S module is ≈15 × 18 mm with a single row of
+castellated pads along one edge; the XIAO ESP32-C6 is ≈21 × 17.5 mm with two
+2.54 mm headers on opposite long edges, plus a USB-C connector and antenna
+that need clearance. This is a flying-wire rework — the CB2S is desoldered,
+the XIAO is mounted wherever it fits inside the enclosure, and each signal is
+run as an individual wire from the vacated footprint pad to the corresponding
+XIAO pad. Check clearance to mains-carrying copper before fixing the XIAO in
+place.
+
+**Power.** The plug's AMS1117 3.3 V rail feeds the XIAO's **3V3** pad,
+back-feeding the XIAO's own regulator output. Do **not** use the XIAO's
+5V/VBUS pad for this — that pad is the *input* to the XIAO's onboard LDO, and
+3.3 V there sits below the regulator's dropout voltage, so the board will
+brown out or run marginally. The AMS1117's headroom for the ESP32-C6's WiFi/
+Thread radio's current peaks has not been measured; add bulk capacitance at
+the XIAO's 3V3 pad if it browns out under radio load.
+
+**The `RX1` pad carries the button, not a UART line.** The measured pinout
+above puts the button on **P10**; on this module, P10 is the internal BK7231N
+pin brought out to the pad silkscreened `RX1` (confirmed against the plug's
+schematic) — a naming leftover from the module's UART1, not an indication
+that anything UART-related is wired there.
+
+### Pin assignment
+
+Six signals, plus power and ground, land on real, reachable footprint pads —
+no PCB rework needed. Grouped so the BL0937 signals are contiguous and the
+relay sits furthest from the pulse-counting inputs to reduce switching-noise
+coupling:
+
+| Plug net | CB2S pad | Direction (XIAO's view) | XIAO pad | GPIO |
+|---|---|---|---|---|
+| BL0937 `CF` (active power) | `P7` | in — pulse count | **D0** | GPIO0 |
+| BL0937 `CF1` (V/I, muxed) | `P6` | in — pulse count | **D1** | GPIO1 |
+| BL0937 `SEL` | `P24` | **out** — XIAO drives the mux | **D2** | GPIO2 |
+| Button | `RX1` (= P10) | in — pull-up, edge | **D3** | GPIO21 |
+| WiFi LED (repurposed as network LED) | `P8` | out | **D4** | GPIO22 |
+| Relay | `P26` | out | **D5** | GPIO23 |
+| 3.3 V rail | `3V3` | power in | **3V3** | — |
+| Ground | `GND` | ↔ | **GND** | — |
+| — | `CEN`, `ADC`, `TX1` | — | *not connected* | — |
+
+XIAO-side pin choices are ours, since the two boards are joined by hand
+rather than sharing a connector. Constraints applied:
+
+- **D6/D7 (GPIO16/17) are deliberately left unused** — these are the
+  ESP32-C6's default console UART0 pins. Wiring a signal there crash-loops
+  the console the moment the peripheral driver also claims them.
+- None of D0–D10 are ESP32-C6 strapping pins (GPIO4/5/8/9/15, which sit on
+  the XIAO's MTMS/MTDI/Boot/Light pads — none used by this design), so none
+  of the choices above affect boot behaviour.
+
+```mermaid
+flowchart LR
+    subgraph CB2S["CB2S footprint (11 castellated pads)"]
+        direction TB
+        C_CEN["CEN"]
+        C_ADC["ADC"]
+        C_P8["P8 · WiFi LED"]
+        C_P7["P7 · CF"]
+        C_P6["P6 · CF1"]
+        C_3V3["3V3"]
+        C_GND["GND"]
+        C_RX1["RX1 · button (P10)"]
+        C_TX1["TX1"]
+        C_P24["P24 · SEL"]
+        C_P26["P26 · relay"]
+    end
+
+    subgraph XIAO["XIAO ESP32-C6"]
+        direction TB
+        X_3V3["3V3"]
+        X_GND["GND"]
+        X_D0["D0 (GPIO0)"]
+        X_D1["D1 (GPIO1)"]
+        X_D2["D2 (GPIO2)"]
+        X_D3["D3 (GPIO21)"]
+        X_D4["D4 (GPIO22)"]
+        X_D5["D5 (GPIO23)"]
+    end
+
+    C_3V3 -.->|"AMS1117 3V3 -> XIAO 3V3 (back-feed)"| X_3V3
+    C_GND ---|ground| X_GND
+    C_P7 -->|"CF pulses -> XIAO"| X_D0
+    C_P6 -->|"CF1 pulses -> XIAO"| X_D1
+    C_P24 <--|"XIAO drives SEL"| X_D2
+    C_RX1 -->|"button -> XIAO"| X_D3
+    C_P8 <--|"XIAO drives LED"| X_D4
+    C_P26 <--|"XIAO drives relay"| X_D5
+
+    C_CEN -.not connected.- C_CEN
+    C_ADC -.not connected.- C_ADC
+    C_TX1 -.not connected.- C_TX1
+
+    classDef nc fill:#eee,stroke:#999,color:#999
+    class C_CEN,C_ADC,C_TX1 nc
+```
+
+Legend: `-->` = signal flows from the plug board into the XIAO (the XIAO
+reads it — `CF`, `CF1`, button); `<--` = signal flows from the XIAO into the
+plug board (the XIAO drives it — `SEL`, LED, relay); `---` = common ground;
+dotted = power feed or not-connected.
+
+### Bench verification checklist
+
+- [ ] Continuity-check all 11 footprint pads to their nets **before**
+      desoldering the CB2S — the pad↔net mapping above is inferred from the
+      measured *pin* map, not probed at the *pad* itself.
+- [ ] Confirm `CEN` and `ADC` are genuinely unused on this PCB (`CEN` is
+      likely pulled high; check whether anything else rides that net).
+- [ ] Confirm the AMS1117 sustains the ESP32-C6's WiFi/Thread radio peak
+      current without browning out.
+- [ ] Confirm the relay is **de-energised through XIAO boot** — check the
+      pad's state across reset *before* wiring it to a live load.
+- [ ] Confirm the plug's LED polarity (assumed active-high in firmware;
+      verify on the bench).
+- [ ] Confirm `SEL` polarity and `CF1` settling time after each toggle — see
+      the calibration note in [CLAUDE.md](CLAUDE.md); the firmware currently
+      ships with an **unverified placeholder** for this.
+- [ ] Re-derive this unit's BL0937 calibration divisors against a real load
+      with an isolation transformer — the coefficients recovered above (§
+      Calibration coefficients) are Tuya-format multipliers, not the
+      counts-per-second-per-unit divisors the firmware's driver expects, and
+      belong to this unit's specific shunt in any case.
+- [ ] Verify physical fit and clearance from mains-carrying copper and from
+      the relay/shunt to the XIAO's antenna.
+
+---
+
 ## Power metering — BL0937
 
 The plug uses a **BL0937** (HLW8012-compatible) energy-metering front end. It has no

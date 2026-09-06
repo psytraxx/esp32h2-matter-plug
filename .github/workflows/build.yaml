@@ -1,0 +1,55 @@
+name: Firmware
+
+# Only build when something that affects the firmware changes — documentation
+# and doc/ image edits do not need a multi-minute ESP-IDF build.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'main/**'
+      - 'CMakeLists.txt'
+      - 'sdkconfig.defaults'
+      - 'partitions.csv'
+      - '.github/workflows/build.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'main/**'
+      - 'CMakeLists.txt'
+      - 'sdkconfig.defaults'
+      - 'partitions.csv'
+      - '.github/workflows/build.yaml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build firmware
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Cache managed components
+        uses: actions/cache@v6
+        with:
+          path: managed_components
+          key: managed-components-esp32c6-${{ hashFiles('dependencies.lock', 'main/idf_component.yml') }}
+          restore-keys: managed-components-esp32c6-
+
+      - name: Cache ccache
+        uses: actions/cache@v5
+        with:
+          path: .ccache
+          key: ccache-esp32c6-${{ github.sha }}
+          restore-keys: ccache-esp32c6-
+
+      - name: Build firmware
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.0.3
+          target: esp32c6
+          command: idf.py build
+          extra_docker_args: -v ${{ github.workspace }}/.ccache:/root/.ccache -e CCACHE_DIR=/root/.ccache -e IDF_CCACHE_ENABLE=1
