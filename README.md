@@ -297,6 +297,79 @@ EOF
 
 ---
 
+## Matter commissioning identity — changing the pairing code
+
+Each flashed device's QR payload / manual pairing code (e.g.
+`MT:CCT91CEK01O2S20AG00` / `20029312363`) is derived entirely from three
+values in `main/chip_project_config.h`:
+
+- `CHIP_DEVICE_CONFIG_USE_TEST_SETUP_DISCRIMINATOR` — a 12-bit value
+  (`0x000`–`0xFFF`) advertised in commissionable-node discovery so a
+  controller can tell devices apart before pairing. Must be unique among
+  devices being commissioned at the same time.
+- `CHIP_DEVICE_CONFIG_USE_TEST_SETUP_PIN_CODE` — the setup passcode
+  (1–99999998), excluding the trivial values the Matter spec forbids (e.g.
+  `00000000`, `11111111`, `12345678`). This is the plaintext number printed
+  on the manual pairing code and encoded in the QR payload.
+- `CHIP_DEVICE_CONFIG_USE_TEST_SPAKE2P_VERIFIER` — a base64 SPAKE2+
+  verifier. The CHIP stack authenticates a commissioner's PAKE exchange
+  against *this* verifier, never against the plaintext passcode above — the
+  passcode is only for humans/QR codes. The two are cryptographically
+  linked: change the passcode and the verifier must be regenerated to
+  match, or commissioning fails (silently — the device just never completes
+  PASE, no informative error).
+
+Without this file the CHIP SDK falls back to its shared test values
+(passcode `20202021`, discriminator `0xF00`), which is why every device
+built from unmodified `main/chip_project_config.h` would otherwise print
+the identical pairing code — a problem the moment you have more than one
+device on the same Thread network / fabric.
+
+### To change it
+
+1. Pick a new discriminator (any `0x000`–`0xFFF`, must differ from any
+   other device you'll commission concurrently).
+2. Pick a new passcode (1–99999998, not one of the spec's forbidden trivial
+   values) and regenerate the matching verifier:
+
+   ```sh
+   python3 tools/spake2p_verifier.py <passcode>
+   ```
+
+   This script (`tools/spake2p_verifier.py`) reimplements the CHIP SDK's
+   `Spake2pVerifier::Generate()`: it runs PBKDF2-HMAC-SHA256 over the
+   passcode (using the same default salt/iteration-count the SDK's test
+   verifier uses) to derive `w0`/`w1`, reduces both mod the NIST P-256
+   group order, derives `L = w1 * G` on P-256, and prints
+   `base64(w0 || L)` — the verifier blob CHIP expects. It self-checks
+   against a known vector (passcode `20202021`) before printing your
+   result, so a broken `cryptography` install fails loudly rather than
+   silently emitting a bad verifier.
+
+3. Edit `main/chip_project_config.h` and update all three defines together
+   — discriminator, pin code, and the freshly generated verifier. The
+   passcode and verifier **must** be kept in sync; a stale verifier for a
+   changed passcode bricks commissioning without any error pointing at the
+   cause.
+4. Rebuild and reflash:
+
+   ```sh
+   idf.py build
+   idf.py flash monitor
+   ```
+
+   The new QR payload / manual code is printed on boot (`matter_setup: Matter
+   manual code: …` / `matter_setup: Matter QR payload : …`) once the
+   commissioning window opens.
+
+If a device was already commissioned onto a fabric before you change these
+values, changing them does not un-commission it — the fabric binding lives
+in NVS, separate from the setup passcode/discriminator. Factory-reset the
+device (or erase its NVS) if you need it to forget its old fabric before
+re-commissioning with the new code.
+
+---
+
 ## Future work — two firmware flavours from one codebase
 
 The firmware should eventually build in two variants:

@@ -304,8 +304,20 @@ extern "C" void matter_setup(EventGroupHandle_t boot_events,
     // EPM/EEM init: only valid once the data model has loaded, i.e. after
     // esp_matter::start(). See uascent-matter/src/app_task.cpp's
     // mPostServerInitClbk comment for the same ordering requirement on Zephyr.
-    if (PowerMeasurementInit(s_ep_plug) != CHIP_NO_ERROR)
-        ESP_LOGE(TAG, "PowerMeasurementInit failed — metering will not report");
+    //
+    // Instance::Init() below calls into CHIP's data-model provider
+    // (RegisterAttributeChangeListener et al.), which asserts the CHIP stack
+    // lock is held by the caller (Provider.cpp's
+    // assertChipStackLockedByCurrentThread()). Unlike esp_matter::attribute::
+    // update()/get_val() (which take esp_matter's own lock::ScopedChipStackLock
+    // internally), this raw CHIP SDK call does not -- app_main's task must take
+    // the lock itself, or the Matter/CHIP main-loop task racing on the same
+    // provider trips the "unsafe/racy" abort seen here.
+    {
+        chip::DeviceLayer::StackLock lock;
+        if (PowerMeasurementInit(s_ep_plug) != CHIP_NO_ERROR)
+            ESP_LOGE(TAG, "PowerMeasurementInit failed — metering will not report");
+    }
 
     // esp_matter restores persisted attribute values from NVS into its
     // internal store on start(), but that restore does not go through

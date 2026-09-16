@@ -13,6 +13,7 @@
 #include <app/server/Server.h>
 #include <app/util/attribute-storage.h>
 #include <lib/support/BitMask.h>
+#include <platform/CHIPDeviceLayer.h>
 #include <platform/KeyValueStoreManager.h>
 
 #include "esp_log.h"
@@ -354,6 +355,17 @@ void PowerMeasurementUpdate(int64_t activePowerMw, int64_t rmsVoltageMv, int64_t
 	if (!sDelegate) {
 		return;
 	}
+
+	/* Called from the FreeRTOS timer service task (bl0937.cpp's MeterPoll()
+	 * via app_main.cpp's meter_poll_timer_cb), not the CHIP/Matter task.
+	 * Every call below eventually reaches the data-model provider
+	 * (ReportIfMoved() -> MatterReportingAttributeChangeCallback(),
+	 * NotifyCumulativeEnergyMeasured()), which asserts the CHIP stack lock
+	 * is held by the caller -- unlike esp_matter::attribute::update(), these
+	 * CHIP SDK entry points do not take it themselves. See matter_setup.cpp's
+	 * PowerMeasurementInit() StackLock comment for the same requirement at
+	 * init time. */
+	chip::DeviceLayer::StackLock lock;
 
 	sDelegate->Set(activePowerMw, rmsVoltageMv, rmsCurrentMa);
 
