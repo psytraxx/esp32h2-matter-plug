@@ -19,6 +19,9 @@ void SetLevel(bool on)
 {
     // Polarity UNVERIFIED for this plug's LED — see status_led.h.
     gpio_set_level(PIN_LED, on ? 1 : 0);
+    // XIAO's own onboard LED, mirrored 1:1 with the plug's LED so status is
+    // visible without the plug-side LED net wired up.
+    gpio_set_level(PIN_ONBOARD_LED, on ? 1 : 0);
 }
 
 void BlinkTimerCallback(TimerHandle_t)
@@ -39,7 +42,7 @@ void StopBlink(void)
 void status_led_init(void)
 {
     gpio_config_t cfg = {
-        .pin_bit_mask = (1ULL << PIN_LED),
+        .pin_bit_mask = (1ULL << PIN_LED) | (1ULL << PIN_ONBOARD_LED),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,

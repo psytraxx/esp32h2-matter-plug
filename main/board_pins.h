@@ -52,3 +52,9 @@
 #define PIN_RELAY GPIO_NUM_23 // D5
 
 // D6/D7 (GPIO16/17) intentionally unused — console UART0. D8-D10 are spare.
+
+// XIAO ESP32-C6 module's own onboard LED (not on the CB2S footprint at all —
+// this is the dev-board LED soldered to the XIAO itself, GPIO15, independent
+// of PIN_LED above). Mirrored to the same state as PIN_LED so the status is
+// visible even before the plug's own LED net is wired up on the bench.
+#define PIN_ONBOARD_LED GPIO_NUM_15
