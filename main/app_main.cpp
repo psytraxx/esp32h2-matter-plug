@@ -12,6 +12,7 @@
 #include "app_config.h"
 #include "matter_setup.h"
 #include "button.h"
+#include "board_pins.h"
 #include "status_led.h"
 #include "relay.h"
 #include "bl0937.h"
@@ -45,6 +46,16 @@ static void on_button_short_press(void)
     matter_button_toggle();
 }
 
+// Onboard BOOT button (GPIO9) — bench/dev convenience only. It's the XIAO
+// module's own button, unreachable once the plug is closed up, so it only
+// gets the long-press factory-reset action; the plug's own button remains
+// the real user-facing control (short press too, via on_button_short_press).
+static void on_boot_button_long_press(void)
+{
+    ESP_LOGW(TAG, "Factory reset via onboard BOOT button!");
+    matter_factory_reset();
+}
+
 // ── Meter poll timer (runs in the FreeRTOS timer service task) ─────────────
 
 static void meter_poll_timer_cb(TimerHandle_t)
@@ -52,11 +63,32 @@ static void meter_poll_timer_cb(TimerHandle_t)
     MeterPoll();
 }
 
+// Routes the XIAO's radio to its onboard ceramic antenna rather than the
+// unpopulated U.FL connector. Runs before the Matter stack brings the radio up.
+static void rf_antenna_init()
+{
+    gpio_config_t cfg = {
+        .pin_bit_mask = (1ULL << PIN_RF_SWITCH_EN) | (1ULL << PIN_RF_ANT_SELECT),
+        .mode         = GPIO_MODE_OUTPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&cfg));
+    ESP_ERROR_CHECK(gpio_set_level(PIN_RF_SWITCH_EN, 0));   // enable RF switch
+    ESP_ERROR_CHECK(gpio_set_level(PIN_RF_ANT_SELECT, 0));  // onboard antenna
+
+    ESP_LOGI(TAG, "RF switch enabled, onboard antenna selected");
+}
+
 // One-time hardware and subsystem initialisation.
 static void app_init()
 {
     g_boot_events = xEventGroupCreate();
     configASSERT(g_boot_events);
+
+    // Before matter_setup() — the radio must not come up on the wrong antenna.
+    rf_antenna_init();
 
     status_led_init();
     status_led_set(STATUS_LED_BOOT);
@@ -70,7 +102,11 @@ static void app_init()
 
     // Interrupt-driven plug button — short press toggles the relay via the
     // OnOff cluster, long hold factory-resets.
-    button_init(on_button_long_press, on_button_short_press);
+    button_init(PIN_BUTTON, on_button_long_press, on_button_short_press);
+
+    // Onboard BOOT button — a second, bench-only long-press factory-reset
+    // trigger for when the plug enclosure isn't open (see PIN_BOOT_BUTTON).
+    button_init(PIN_BOOT_BUTTON, on_boot_button_long_press, NULL);
 
     // BL0937 energy meter. Poll rate is part of the calibration -- see
     // METER_POLL_INTERVAL_MS in app_config.h.

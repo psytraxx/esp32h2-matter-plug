@@ -44,6 +44,13 @@
 // the plug's schematic, not a rework or jumper.
 #define PIN_BUTTON GPIO_NUM_21 // D3
 
+// XIAO ESP32-C6 module's own onboard BOOT button (not on the CB2S footprint —
+// this is the dev-board button soldered to the XIAO itself, GPIO9, active-low
+// to GND via the module's own pull-up, independent of PIN_BUTTON above). Wired
+// in as a second, bench-only factory-reset trigger: once the plug is closed up
+// this pin isn't reachable, so PIN_BUTTON remains the real user-facing control.
+#define PIN_BOOT_BUTTON GPIO_NUM_9
+
 // Plug's WiFi-status LED (repurposed here as the Matter network/commissioning
 // indicator — see status_led.h).
 #define PIN_LED GPIO_NUM_22 // D4
@@ -58,3 +65,13 @@
 // of PIN_LED above). Mirrored to the same state as PIN_LED so the status is
 // visible even before the plug's own LED net is wired up on the bench.
 #define PIN_ONBOARD_LED GPIO_NUM_15
+
+// XIAO ESP32-C6 RF antenna switch (module-internal, not on the CB2S
+// footprint). The board has both an onboard ceramic antenna and a U.FL
+// connector; this design uses the onboard one, selected explicitly rather
+// than left to whatever the pins float to. Per the XIAO ESP32-C6 pinout:
+// GPIO3 low enables the RF switch, GPIO14 selects internal (low) vs
+// external (high). Neither pad is exposed on the castellated footprint, so
+// there is nothing to wire — this is purely a software selection.
+#define PIN_RF_SWITCH_EN  GPIO_NUM_3   // drive LOW to enable the RF switch
+#define PIN_RF_ANT_SELECT GPIO_NUM_14  // LOW = onboard ceramic, HIGH = U.FL
