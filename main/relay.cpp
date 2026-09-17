@@ -4,6 +4,7 @@
 #include "driver/gpio.h"
 
 #include "board_pins.h"
+#include "status_led.h"
 
 static const char *TAG = "relay";
 
@@ -40,12 +41,12 @@ void RelaySet(bool on)
 	}
 	sOn = on;
 
-	// This plug has only one software-driven LED (the network/commissioning
-	// indicator on PIN_LED, see status_led.h) -- unlike uascent-matter's
-	// donor board, this CB2S plug's relay-state LED (if any) sits on the
-	// relay drive net itself in hardware and needs no GPIO of its own to
-	// follow relay state. No StatusLedSetRelayState() call here as a result;
-	// confirm this against the actual board before assuming it.
+	// The plug's own relay-state LED (if any) sits on the relay drive net in
+	// hardware and needs no GPIO. The XIAO's onboard LED does need driving,
+	// and shows relay state because the coil runs off a mains-derived rail:
+	// on USB-only bench power the relay will not click, so this LED is the
+	// only feedback that a controller toggle actually landed (see relay.h).
+	status_led_set_relay(on);
 }
 
 bool RelayIsOn(void)

@@ -155,7 +155,6 @@ static bool run_commissioning()
     }
 
     ESP_LOGI(TAG, "Commissioning complete — joining Thread, staying live for controller interview");
-    status_led_set(STATUS_LED_OK);
     return true;
 }
 
@@ -180,6 +179,12 @@ extern "C" void app_main(void)
     // writes before this point return INVALID_STATE.
     xEventGroupWaitBits(g_boot_events, BOOT_BIT_SERVER_READY,
                         pdFALSE, pdTRUE, pdMS_TO_TICKS(30000));
+
+    // Every boot, not just a freshly-commissioned one: an already-paired device
+    // returns early from run_commissioning() and would otherwise sit on the
+    // boot indication forever. This also clears the commissioning blink's hold
+    // on the onboard LED, handing it back to relay state.
+    status_led_set(STATUS_LED_OK);
 
     ESP_LOGI(TAG, "Ready — button toggles the relay, metering reports over Matter");
 }
