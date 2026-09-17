@@ -74,11 +74,14 @@ CONFIG_LWIP_MULTICAST_PING=y
 CONFIG_USE_MINIMAL_MDNS=n
 CONFIG_MBEDTLS_SSL_PROTO_DTLS=y
 
-# Power management: dynamic frequency scaling only. Light sleep is deliberately
-# NOT enabled — the radio has to stay listening for a router, and mains power
-# means there is nothing to save it for.
-CONFIG_PM_ENABLE=y
-CONFIG_PM_DFS_INIT_AUTO=y
+# Power management disabled outright. Mains power means there is nothing to
+# save it for, and on the ESP32-C6 even DFS-only PM (no light sleep) destabilises
+# the 802.15.4 radio once BLE deinits after commissioning: the Thread link goes
+# NoAck, the node detaches from its parent and forms its own partition as leader,
+# which looks to the Border Router like the device simply vanished. The giveaway
+# is "phy: phy wait timeout" in the log shortly after "BLE deinit successful".
+CONFIG_PM_ENABLE=n
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160=y
 
 CONFIG_ENABLE_EXTENDED_DISCOVERY=y
 
