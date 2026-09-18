@@ -159,8 +159,9 @@ this design leaves unconnected.
       browning out.
 - [ ] Confirm the relay is **de-energised through board boot** — check the
       pad's state across reset *before* wiring it to a live load.
-- [ ] Confirm the plug's LED polarity (assumed active-high in firmware;
-      verify on the bench).
+- [x] ~~Confirm the plug's LED polarity.~~ Measured: **active-low** (anode to
+      3.3 V, cathode to the GPIO). The firmware drives it that way; the two
+      onboard LEDs are active-high.
 - [ ] Confirm the onboard RGB LED's colour order. The firmware drives it as
       WS2812/GRB; if red and green come out swapped, the pixel is RGB-ordered
       — change `LED_STRIP_COLOR_COMPONENT_FMT_GRB` in `main/status_led.cpp`.

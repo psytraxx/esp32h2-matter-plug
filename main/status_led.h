@@ -28,9 +28,10 @@
 //    has to pre-empt the other — a single onboard LED arbitrating between them
 //    would lose relay state for the whole commissioning window.
 //
-// PIN_LED polarity is UNVERIFIED — confirm on the bench (README's Verification
-// section) before relying on "off" meaning what you expect. Both onboard LEDs
-// are driven active-high, which is how this board wires them.
+// PIN_LED is driven ACTIVE-LOW: this plug ties the LED's anode to 3.3 V and
+// its cathode to the GPIO, so the pin sinks to light it. The two onboard LEDs
+// are the opposite, active-high, which is how the SuperMini wires them — so
+// "on" is 0 for the plug's LED and 1 for the onboard pair. Don't unify them.
 
 #include <stdbool.h>
 

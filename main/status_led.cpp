@@ -44,10 +44,13 @@ Rgb ColorFor(status_led_state_t state)
     return {0, 0, 0};
 }
 
+// Active-low: this plug wires the LED's anode to 3.3 V through a resistor and
+// its cathode to the GPIO, so the pin has to sink for the LED to light and 0
+// lights it. Measured on the bench — driving it active-high left it dark in
+// every state.
 void SetLevel(bool on)
 {
-    // Polarity UNVERIFIED for this plug's LED — see status_led.h.
-    gpio_set_level(PIN_LED, on ? 1 : 0);
+    gpio_set_level(PIN_LED, on ? 0 : 1);
 }
 
 // Active-high: this board's yellow user LED sources through the pin.
