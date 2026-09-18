@@ -159,9 +159,6 @@ this design leaves unconnected.
       browning out.
 - [ ] Confirm the relay is **de-energised through board boot** — check the
       pad's state across reset *before* wiring it to a live load.
-- [x] ~~Confirm the plug's LED polarity.~~ Measured: **active-low** (anode to
-      3.3 V, cathode to the GPIO). The firmware drives it that way; the two
-      onboard LEDs are active-high.
 - [ ] Confirm the onboard RGB LED's colour order. The firmware drives it as
       WS2812/GRB; if red and green come out swapped, the pixel is RGB-ordered
       — change `LED_STRIP_COLOR_COMPONENT_FMT_GRB` in `main/status_led.cpp`.
@@ -248,60 +245,6 @@ Schema `000004fhhe` — retained for reference, as it documents what the hardwar
 | 40 | enum | Indicator mode — `relay` / `pos` / `none` / `on` |
 | 41 | bool | Child lock |
 | 42–44 | string | Cycle / random / inching schedule |
-
----
-
-## Other devices analysed
-
-Two further dumps were examined; both are **stock Tuya** (encrypted app image,
-plaintext TLV config at `0x1D0000`) and **neither has power metering** — no
-`ele_pin`, `vi_pin`, `sel_pin_pin`, `ele_fun_en`, or `resistor` keys.
-
-| | Metering plug (this doc) | `smartswitch10a` | `lspa10` |
-|---|---|---|---|
-| Relay | P26 | P7 | P26 |
-| Button | P10 | P23 | P10 |
-| WiFi LED | P8 | P26 | P8 |
-| BL0937 SEL / CF1 / CF | P24 / P6 / P7 | — | — |
-| Metering | ✅ | ❌ | ❌ |
-
-`lspa10` raw config:
-```
-{reset_t:5,netled1_pin:8,rl1_lv:1,bt_type:0,bt1_pin:10,module:CB2S,net_trig:2,
- ch_cddpid1:9,jv:1.0.2,netled1_lv:0,netled_reuse:0,ffc_select:0,nety_led:1,
- ch_num:1,total_stat:2,rl1_pin:26,netn_led:0,ch_dpid1:1,bt1_lv:0,crc:52,}
-```
-
-`smartswitch10a` raw config:
-```
-{rl1_lv:1,on_off_cnt:10,onoff_rst_m:1,onoff_clear_t:10,rand_dpid:42,net_trig:2,
- onoff_n:3,netled1_lv:0,jv:110.0.0,onoff_rst_type:2,ffc_select:0,total_bt_pin:23,
- nety_led:2,total_stat:2,reset_t:5,netled1_pin:26,remote_add_dp:49,remote_list_dp:50,
- net_type:0,inch_dp:44,module:CB2S,ch_cddpid1:9,inch_en1:0,onoff1:6,clean_t:5,
- init_conf:38,zero_select:0,onoff_type:0,series_ctrl:0,total_bt_lv:0,cyc_dpid:43,
- ch_num:1,rl1_pin:7,netn_led:2,ch_dpid1:1,crc:69,}
-```
-
-Note that `lspa10`'s relay/button/LED pins (26 / 10 / 8) coincidentally match the
-values `info.txt` lists — both are common CB2S reference layouts. `info.txt`
-nonetheless describes the **metering** device, since it also carries the BL0937 pins
-and DPs 17–25 that `lspa10` does not have.
-
----
-
-## ⚠️ Backup status
-
-The flash images for all three devices were removed from the working tree during
-analysis. **There is currently no restorable backup of the metering plug.** The pin
-map and calibration coefficients above were recovered before deletion, but the image
-itself is gone.
-
-Re-dump any device before flashing it:
-
-```sh
-# read full 2 MB flash via UART1 (RX1/TX1 on the module's back edge)
-bk7231tools read_flash -d /dev/ttyUSB0 -s 0x0 -c 0x200000 backup.bin
-```
 
 ---
 
@@ -393,39 +336,6 @@ values, changing them does not un-commission it — the fabric binding lives
 in NVS, separate from the setup passcode/discriminator. Factory-reset the
 device (or erase its NVS) if you need it to forget its old fabric before
 re-commissioning with the new code.
-
----
-
-## Future work — two firmware flavours from one codebase
-
-The firmware should eventually build in two variants:
-
-- **Metering** — On/Off plus `ElectricalPowerMeasurement` and
-  `ElectricalEnergyMeasurement`, BL0937 driver. (What `main/` targets today.)
-- **Switch-only** — On/Off only, no BL0937, no Electrical\*Measurement
-  clusters. For CB2S-footprint plugs with no metering front end (e.g. the
-  `smartswitch10a` / `lspa10` layouts above).
-
-Both run on the same ESP32-H2 SuperMini, so this is a pure feature split, not
-a per-target one.
-
-Recommended structure — one `main/`, build-time variant selection, not
-branches or a second repo (the On/Off path, commissioning, button/LED/relay
-and the Thread stack are ~90% shared; the metering code is already isolated
-in `power_measurement.cpp` / `bl0937.cpp`):
-
-1. **Own Kconfig feature flag**: `PLUG_ENERGY_METERING` in
-   `main/Kconfig.projbuild`, `default y`. Gate the cluster `create()` calls in
-   `matter_setup.cpp` and the source-file list in `main/CMakeLists.txt` on it.
-2. **Distinct factory identity per flavour** — separate VID/PID/discriminator
-   and pairing code (`tools/spake2p_verifier.py` run once per passcode),
-   driven from the Kconfig flag.
-3. **Separate build dirs** (`idf.py -B build/switch-only …`) so switching
-   flavour doesn't force a full reconfigure in a shared dir.
-
-Compile-time (not runtime) selection is deliberate: the BL0937 GPIO/ISR code
-shouldn't link on a board with no BL0937, and dropping it shrinks the
-switch-only image.
 
 ---
 
