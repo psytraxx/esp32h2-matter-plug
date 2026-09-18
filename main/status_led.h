@@ -2,13 +2,26 @@
 
 // Three LEDs show this plug's state, each with a distinct job.
 //
-// 1. PIN_LED — the plug's own WiFi-status LED on the CB2S footprint,
-//    repurposed as the Matter network/commissioning indicator: solid on for
-//    boot/paired, blinking while the commissioning window is open. This is
+// 1. PIN_LED — the plug's own WiFi-status LED on the CB2S footprint. This is
 //    the only indicator visible once the enclosure is closed, so it is the
-//    user-facing one. The plug's other LED (measured on the P26/relay net in
-//    the original CB2S wiring) sits on the relay drive net in hardware and
-//    follows relay state without a GPIO of its own; see relay.cpp.
+//    user-facing one, and it shows different things in different phases:
+//
+//      boot           solid on
+//      commissioning  blinking (pairing window open)
+//      paired / OK    follows the relay — on when the load is on
+//      error          off (with the onboard RGB red)
+//
+//    The handover happens at STATUS_LED_OK and is tracked by
+//    sRelayOwnsPlugLed in the .cpp. The reasoning: before pairing there is no
+//    meaningful relay state to show (the relay is held open through boot, and
+//    on USB-only bench power the coil cannot click at all) and a pairing cue
+//    is the only thing a user can act on; afterwards, relay state is what a
+//    mains plug's indicator is for. Error reclaims the LED so a stuck-on
+//    relay cannot mask the error cue.
+//
+//    The plug's other LED (measured on the P26/relay net in the original CB2S
+//    wiring) sits on the relay drive net in hardware and follows relay state
+//    without a GPIO of its own; see relay.cpp.
 //
 // 2. PIN_RGB_LED — the SuperMini's onboard addressable RGB LED, carrying the
 //    same network state as PIN_LED but as a colour, which is legible at a
@@ -49,13 +62,15 @@ extern "C" {
 
 void status_led_init(void);
 
-// Drives the network/commissioning indication on both the plug's LED
-// (PIN_LED) and the onboard RGB LED (PIN_RGB_LED).
+// Drives the network/commissioning indication on the onboard RGB LED
+// (PIN_RGB_LED), and on the plug's LED (PIN_LED) except in the paired/OK
+// state, where PIN_LED is handed over to status_led_set_relay().
 void status_led_set(status_led_state_t state);
 
-// Drives the onboard yellow LED (PIN_ONBOARD_LED) from relay state. Takes
-// effect immediately and is never overridden — it shares no LED with the
-// network indication.
+// Drives relay state onto the onboard yellow LED (PIN_ONBOARD_LED) always,
+// and onto the plug's LED (PIN_LED) once paired. Safe to call in any phase:
+// before the handover it just records the state, so the commissioning blink
+// is left intact and the LED still comes up at the right level at handover.
 void status_led_set_relay(bool on);
 
 #ifdef __cplusplus
