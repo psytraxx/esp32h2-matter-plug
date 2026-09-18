@@ -2,8 +2,8 @@
 
 Converting a Tuya-based energy-metering smart plug — built around a **CB2S**
 module (Beken **BK7231N**, Cortex-M4F @ 120 MHz, 256 KB SRAM, 2 MB SPI flash)
-— into a fully Matter-controlled plug: the stock module is replaced with a
-**Seeed Studio XIAO ESP32-C6**, and the plug's relay, button, and BL0937
+— into a fully Matter-controlled plug: the stock module is replaced with an
+**ESP32-H2 SuperMini**, and the plug's relay, button, and BL0937
 energy meter are kept and driven by new firmware speaking **Matter over
 Thread**, including live power/energy reporting.
 
@@ -14,8 +14,9 @@ This repo carries both halves of that conversion:
   which the new firmware and wiring depend on.
 - **The replacement firmware** (`main/`, ESP-IDF + esp_matter) — see
   [CLAUDE.md](CLAUDE.md) for its architecture and build instructions, and the
-  [Wiring](#wiring--replacing-the-cb2s-with-a-xiao-esp32-c6) section below for
-  how the XIAO is wired into the vacated CB2S footprint.
+  [Wiring](#wiring--replacing-the-cb2s-with-an-esp32-h2-supermini) section
+  below for how the replacement board is wired into the vacated CB2S
+  footprint.
 
 ---
 
@@ -54,35 +55,44 @@ This is the measured hardware wiring and should be treated as the authoritative 
 
 ---
 
-## Wiring — replacing the CB2S with a XIAO ESP32-C6
+## Wiring — replacing the CB2S with an ESP32-H2 SuperMini
 
-The CB2S module is desoldered and a **Seeed Studio XIAO ESP32-C6** is wired
-into the pads it vacated, becoming the plug's new brain over Matter/Thread.
-See [CLAUDE.md](CLAUDE.md) for the firmware's build/flash workflow.
+The CB2S module is desoldered and an **ESP32-H2 SuperMini** is wired into the
+pads it vacated, becoming the plug's new brain over Matter/Thread. See
+[CLAUDE.md](CLAUDE.md) for the firmware's build/flash workflow, and
+[doc/h2-supermini-pinmap.md](doc/h2-supermini-pinmap.md) for the replacement
+board's own pin map.
+
+> **Why the H2?** It is 802.15.4 + BLE only — no Wi-Fi — which costs nothing
+> for a Matter-over-Thread device and removes the Wi-Fi/Thread radio-coexistence
+> question entirely. It also carries two software-drivable onboard LEDs, enough
+> for network state and relay state to each have their own indicator, and a
+> single PCB trace antenna with no RF switch to configure.
 
 > **⚠️ Mains safety.** This plug's low-voltage section is **not isolated from
 > mains** — the BL0937's ground sits at mains potential, so every pad on the
-> CB2S footprint can be live. Never connect USB to the XIAO while the plug is
-> connected to mains, and never probe or rework the board while it is plugged
+> CB2S footprint can be live. Never connect USB to the SuperMini while the
+> plug is connected to mains, and never probe or rework the board while it is plugged
 > in. Use an isolation transformer for any bring-up that needs mains present,
 > and discharge the bulk capacitor before handling the board.
 
 **Not a drop-in.** The CB2S module is ≈15 × 18 mm with a single row of
-castellated pads along one edge; the XIAO ESP32-C6 is ≈21 × 17.5 mm with two
-2.54 mm headers on opposite long edges, plus a USB-C connector and antenna
-that need clearance. This is a flying-wire rework — the CB2S is desoldered,
-the XIAO is mounted wherever it fits inside the enclosure, and each signal is
-run as an individual wire from the vacated footprint pad to the corresponding
-XIAO pad. Check clearance to mains-carrying copper before fixing the XIAO in
-place.
+castellated pads along one edge; the ESP32-H2 SuperMini is ≈23 × 18 mm with
+two 2.54 mm headers on opposite long edges, plus a USB-C connector and a PCB
+trace antenna that need clearance. This is a flying-wire rework — the CB2S is
+desoldered, the SuperMini is mounted wherever it fits inside the enclosure,
+and each signal is run as an individual wire from the vacated footprint pad to
+the corresponding SuperMini pad. Check clearance to mains-carrying copper
+before fixing the board in place, and confirm your own board's dimensions —
+"SuperMini" is a form factor sold by several vendors, not one part number.
 
-**Power.** The plug's AMS1117 3.3 V rail feeds the XIAO's **3V3** pad,
-back-feeding the XIAO's own regulator output. Do **not** use the XIAO's
-5V/VBUS pad for this — that pad is the *input* to the XIAO's onboard LDO, and
-3.3 V there sits below the regulator's dropout voltage, so the board will
-brown out or run marginally. The AMS1117's headroom for the ESP32-C6's WiFi/
-Thread radio's current peaks has not been measured; add bulk capacitance at
-the XIAO's 3V3 pad if it browns out under radio load.
+**Power.** The plug's AMS1117 3.3 V rail feeds the SuperMini's **3V3** pad,
+back-feeding the board's own regulator output. Do **not** use the 5V/VBUS pad
+for this — that pad is the *input* to the onboard LDO, and 3.3 V there sits
+below the regulator's dropout voltage, so the board will brown out or run
+marginally. The AMS1117's headroom for the ESP32-H2's radio current peaks has
+not been measured; add bulk capacitance at the 3V3 pad if it browns out under
+radio load.
 
 **The `RX1` pad carries the button, not a UART line.** The measured pinout
 above puts the button on **P10**; on this module, P10 is the internal BK7231N
@@ -97,33 +107,41 @@ no PCB rework needed. Grouped so the BL0937 signals are contiguous and the
 relay sits furthest from the pulse-counting inputs to reduce switching-noise
 coupling:
 
-| Plug net | CB2S pad | Direction (XIAO's view) | XIAO pad | GPIO |
+| Plug net | CB2S pad | Direction (board's view) | SuperMini pad | GPIO |
 |---|---|---|---|---|
-| BL0937 `CF` (active power) | `P7` | in — pulse count | **D0** | GPIO0 |
-| BL0937 `CF1` (V/I, muxed) | `P6` | in — pulse count | **D1** | GPIO1 |
-| BL0937 `SEL` | `P24` | **out** — XIAO drives the mux | **D2** | GPIO2 |
-| Button | `RX1` (= P10) | in — pull-up, edge | **D3** | GPIO21 |
-| WiFi LED (repurposed as network LED) | `P8` | out | **D4** | GPIO22 |
-| Relay | `P26` | out | **D5** | GPIO23 |
-| 3.3 V rail | `3V3` | power in | **3V3** | — |
-| Ground | `GND` | ↔ | **GND** | — |
+| BL0937 `CF` (active power) | `P7` | in — pulse count | **`0`** | GPIO0 |
+| BL0937 `CF1` (V/I, muxed) | `P6` | in — pulse count | **`1`** | GPIO1 |
+| BL0937 `SEL` | `P24` | **out** — the board drives the mux | **`4`** | GPIO4 |
+| Button | `RX1` (= P10) | in — pull-up, edge | **`5`** | GPIO5 |
+| WiFi LED (repurposed as network LED) | `P8` | out | **`10`** | GPIO10 |
+| Relay | `P26` | out | **`11`** | GPIO11 |
+| 3.3 V rail | `3V3` | power in | **`3V3`** | — |
+| Ground | `GND` | ↔ | **`GND`** | — |
 | — | `CEN`, `ADC`, `TX1` | — | *not connected* | — |
 
-XIAO-side pin choices are ours, since the two boards are joined by hand
+The SuperMini labels its headers with raw GPIO numbers, so the pad silkscreen
+and the GPIO number are the same.
+
+Board-side pin choices are ours, since the two boards are joined by hand
 rather than sharing a connector. Constraints applied:
 
-- **D6/D7 (GPIO16/17) are deliberately left unused** — these are the
-  ESP32-C6's default console UART0 pins. Wiring a signal there crash-loops
-  the console the moment the peripheral driver also claims them.
-- None of D0–D10 are ESP32-C6 strapping pins (GPIO4/5/8/9/15, which sit on
-  the XIAO's MTMS/MTDI/Boot/Light pads — none used by this design), so none
-  of the choices above affect boot behaviour.
+- **GPIO23/GPIO24 (the `RX`/`TX` pads) are deliberately left unused** — these
+  are the ESP32-H2's default console UART0 pins. Wiring a signal there
+  crash-loops the console the moment the peripheral driver also claims them.
+- **GPIO26/GPIO27 are left unused** — they are `USB_D-`/`USB_D+`, carrying the
+  USB-C port used to flash and monitor the board.
+- **No wired signal lands on an ESP32-H2 strapping pin** (GPIO2, GPIO3, GPIO8,
+  GPIO9, GPIO25), so nothing this design drives can hold the chip out of its
+  normal boot mode. GPIO8 and GPIO9 are used, but only as the module's own
+  onboard RGB LED and BOOT button, which the module already wires that way.
+- GPIO13 is skipped for wired signals because the onboard yellow LED sits on
+  it.
 
-![Wiring: plug board net to CB2S pad to XIAO pad, with an arrow on each row showing which direction the signal flows](doc/wiring.svg)
+![Wiring: plug board net to CB2S pad to replacement-board pad, with an arrow on each row showing which direction the signal flows](doc/wiring.svg)
 
-Each arrow points in the direction the signal actually flows: into the XIAO
-for `CF`, `CF1`, and the button (the XIAO reads them), out of the XIAO for
-`SEL`, the LED, and the relay (the XIAO drives them). Plain lines with no
+Each arrow points in the direction the signal actually flows: into the
+SuperMini for `CF`, `CF1`, and the button (the board reads them), out of it
+for `SEL`, the LED, and the relay (the board drives them). Plain lines with no
 arrowhead are power/ground; dotted grey rows are the three footprint pads
 this design leaves unconnected.
 
@@ -134,12 +152,19 @@ this design leaves unconnected.
       measured *pin* map, not probed at the *pad* itself.
 - [ ] Confirm `CEN` and `ADC` are genuinely unused on this PCB (`CEN` is
       likely pulled high; check whether anything else rides that net).
-- [ ] Confirm the AMS1117 sustains the ESP32-C6's WiFi/Thread radio peak
-      current without browning out.
-- [ ] Confirm the relay is **de-energised through XIAO boot** — check the
+- [ ] Confirm the SuperMini's flash is actually 4 MB (`esptool.py flash_id`)
+      — `partitions.csv` assumes it, and 2 MB boards exist in this form
+      factor; a 2 MB part will not hold the `app0` region.
+- [ ] Confirm the AMS1117 sustains the ESP32-H2's radio peak current without
+      browning out.
+- [ ] Confirm the relay is **de-energised through board boot** — check the
       pad's state across reset *before* wiring it to a live load.
-- [ ] Confirm the plug's LED polarity (assumed active-high in firmware;
-      verify on the bench).
+- [x] ~~Confirm the plug's LED polarity.~~ Measured: **active-low** (anode to
+      3.3 V, cathode to the GPIO). The firmware drives it that way; the two
+      onboard LEDs are active-high.
+- [ ] Confirm the onboard RGB LED's colour order. The firmware drives it as
+      WS2812/GRB; if red and green come out swapped, the pixel is RGB-ordered
+      — change `LED_STRIP_COLOR_COMPONENT_FMT_GRB` in `main/status_led.cpp`.
 - [ ] Confirm `SEL` polarity and `CF1` settling time after each toggle — see
       the calibration note in [CLAUDE.md](CLAUDE.md); the firmware currently
       ships with an **unverified placeholder** for this.
@@ -149,7 +174,8 @@ this design leaves unconnected.
       counts-per-second-per-unit divisors the firmware's driver expects, and
       belong to this unit's specific shunt in any case.
 - [ ] Verify physical fit and clearance from mains-carrying copper and from
-      the relay/shunt to the XIAO's antenna.
+      the relay/shunt to the SuperMini's PCB trace antenna — a trace antenna
+      is sensitive to nearby copper.
 
 ---
 
@@ -374,34 +400,32 @@ re-commissioning with the new code.
 
 The firmware should eventually build in two variants:
 
-- **C6 / metering** — XIAO ESP32-C6, On/Off plus `ElectricalPowerMeasurement`
-  and `ElectricalEnergyMeasurement`, BL0937 driver. (What `main/` targets today.)
-- **H2 / switch-only** — XIAO ESP32-H2, On/Off only, no BL0937, no
-  Electrical\*Measurement clusters. For CB2S-footprint plugs with no metering
-  front end (e.g. the `smartswitch10a` / `lspa10` layouts above).
+- **Metering** — On/Off plus `ElectricalPowerMeasurement` and
+  `ElectricalEnergyMeasurement`, BL0937 driver. (What `main/` targets today.)
+- **Switch-only** — On/Off only, no BL0937, no Electrical\*Measurement
+  clusters. For CB2S-footprint plugs with no metering front end (e.g. the
+  `smartswitch10a` / `lspa10` layouts above).
+
+Both run on the same ESP32-H2 SuperMini, so this is a pure feature split, not
+a per-target one.
 
 Recommended structure — one `main/`, build-time variant selection, not
 branches or a second repo (the On/Off path, commissioning, button/LED/relay
 and the Thread stack are ~90% shared; the metering code is already isolated
 in `power_measurement.cpp` / `bl0937.cpp`):
 
-1. **Own Kconfig feature flag**, not raw `CONFIG_IDF_TARGET_*` checks:
-   `PLUG_ENERGY_METERING` in `main/Kconfig.projbuild`, `default y if
-   IDF_TARGET_ESP32C6`. Gate the cluster `create()` calls in
+1. **Own Kconfig feature flag**: `PLUG_ENERGY_METERING` in
+   `main/Kconfig.projbuild`, `default y`. Gate the cluster `create()` calls in
    `matter_setup.cpp` and the source-file list in `main/CMakeLists.txt` on it.
-2. **Per-target sdkconfig**: keep shared bits in `sdkconfig.defaults`; add
-   `sdkconfig.defaults.esp32c6` and `sdkconfig.defaults.esp32h2` (H2 has no
-   Wi-Fi — radio co-ex off, `PLUG_ENERGY_METERING=n`). `idf.py set-target`
-   picks the matching file up automatically.
-3. **Distinct factory identity per flavour** — separate VID/PID/discriminator
+2. **Distinct factory identity per flavour** — separate VID/PID/discriminator
    and pairing code (`tools/spake2p_verifier.py` run once per passcode),
-   driven from the per-target sdkconfig or Kconfig.
-4. **Build wrapper + separate build dirs** (`idf.py -B build/esp32h2 …`) so
-   switching target doesn't force a full reconfigure in a shared dir.
+   driven from the Kconfig flag.
+3. **Separate build dirs** (`idf.py -B build/switch-only …`) so switching
+   flavour doesn't force a full reconfigure in a shared dir.
 
-Compile-time (not runtime) selection is deliberate: H2 physically lacks
-Wi-Fi, the BL0937 GPIO/ISR code shouldn't link on a board with no BL0937,
-and dropping it shrinks the H2 image.
+Compile-time (not runtime) selection is deliberate: the BL0937 GPIO/ISR code
+shouldn't link on a board with no BL0937, and dropping it shrinks the
+switch-only image.
 
 ---
 

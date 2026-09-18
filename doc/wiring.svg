@@ -20,7 +20,7 @@
   <!-- Column headers -->
   <text x="310" y="70" font-size="13" font-weight="700" fill="#555" text-anchor="middle">plug board net</text>
   <text x="590" y="70" font-size="13" font-weight="700" fill="#555" text-anchor="middle">CB2S pad</text>
-  <text x="870" y="70" font-size="13" font-weight="700" fill="#555" text-anchor="middle">XIAO pad</text>
+  <text x="870" y="70" font-size="13" font-weight="700" fill="#555" text-anchor="middle">H2 pad</text>
 
   <!-- Safety banner -->
   <rect x="30" y="84" width="1020" height="34" rx="6" fill="#fdecea" stroke="#c0392b" stroke-width="1"/>
@@ -44,7 +44,7 @@
     <rect x="540" y="174" width="100" height="26" rx="4" fill="#ffffff" stroke="#c0392b" stroke-width="1.4"/>
     <text x="590" y="191" font-size="12.5" fill="#8e2b1f" text-anchor="middle" font-weight="600">P26</text>
     <line x1="640" y1="188" x2="810" y2="188" stroke="#c0392b" stroke-width="1.6"/>
-    <text x="870" y="192" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">D5 &#183; GPIO23</text>
+    <text x="870" y="192" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">GPIO11</text>
   </g>
 
   <!-- Row 3: GND -->
@@ -64,7 +64,7 @@
     <rect x="540" y="258" width="100" height="26" rx="4" fill="#ffffff" stroke="#1e8449" stroke-width="1.4"/>
     <text x="590" y="275" font-size="12.5" fill="#1e8449" text-anchor="middle" font-weight="600">P8</text>
     <line x1="640" y1="272" x2="810" y2="272" stroke="#1e8449" stroke-width="1.6"/>
-    <text x="870" y="276" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">D4 &#183; GPIO22</text>
+    <text x="870" y="276" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">GPIO10</text>
   </g>
 
   <!-- Row 5: button (RX1) -->
@@ -74,7 +74,7 @@
     <rect x="540" y="300" width="100" height="26" rx="4" fill="#ffffff" stroke="#1e8449" stroke-width="1.4"/>
     <text x="590" y="317" font-size="12.5" fill="#1e8449" text-anchor="middle" font-weight="600">RX1 &#183; P10</text>
     <line x1="640" y1="314" x2="810" y2="314" stroke="#1e8449" stroke-width="1.6" marker-end="url(#arrowGreen)"/>
-    <text x="870" y="318" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">D3 &#183; GPIO21</text>
+    <text x="870" y="318" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">GPIO5</text>
   </g>
 
   <!-- Row 6: SEL -->
@@ -84,7 +84,7 @@
     <rect x="540" y="342" width="100" height="26" rx="4" fill="#ffffff" stroke="#2471a3" stroke-width="1.4"/>
     <text x="590" y="359" font-size="12.5" fill="#1a4f73" text-anchor="middle" font-weight="600">P24</text>
     <line x1="640" y1="356" x2="810" y2="356" stroke="#2471a3" stroke-width="1.6"/>
-    <text x="870" y="360" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">D2 &#183; GPIO2</text>
+    <text x="870" y="360" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">GPIO4</text>
   </g>
 
   <!-- Row 7: TX1 (not connected) -->
@@ -104,7 +104,7 @@
     <rect x="540" y="426" width="100" height="26" rx="4" fill="#ffffff" stroke="#2471a3" stroke-width="1.4"/>
     <text x="590" y="443" font-size="12.5" fill="#1a4f73" text-anchor="middle" font-weight="600">P7</text>
     <line x1="640" y1="440" x2="810" y2="440" stroke="#2471a3" stroke-width="1.6" marker-end="url(#arrowBlue)"/>
-    <text x="870" y="444" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">D0 &#183; GPIO0</text>
+    <text x="870" y="444" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">GPIO0</text>
   </g>
 
   <!-- Row 9: CEN (not connected) -->
@@ -124,7 +124,7 @@
     <rect x="540" y="510" width="100" height="26" rx="4" fill="#ffffff" stroke="#2471a3" stroke-width="1.4"/>
     <text x="590" y="527" font-size="12.5" fill="#1a4f73" text-anchor="middle" font-weight="600">P6</text>
     <line x1="640" y1="524" x2="810" y2="524" stroke="#2471a3" stroke-width="1.6" marker-end="url(#arrowBlue)"/>
-    <text x="870" y="528" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">D1 &#183; GPIO1</text>
+    <text x="870" y="528" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="600">GPIO1</text>
   </g>
 
   <!-- Row 11: ADC (not connected) -->
@@ -140,9 +140,9 @@
   <!-- Legend -->
   <g font-size="12" fill="#555">
     <line x1="30" y1="600" x2="55" y2="600" stroke="#2471a3" stroke-width="1.6" marker-end="url(#arrowBlue)"/>
-    <text x="62" y="604">into XIAO (it reads this)</text>
+    <text x="62" y="604">into H2 (it reads this)</text>
     <line x1="265" y1="600" x2="290" y2="600" stroke="#2471a3" stroke-width="1.6" marker-start="url(#arrowBlue)"/>
-    <text x="297" y="604">out of XIAO (it drives this)</text>
+    <text x="297" y="604">out of H2 (it drives this)</text>
     <line x1="545" y1="600" x2="570" y2="600" stroke="#aab0b6" stroke-width="1.2" stroke-dasharray="3,3"/>
     <text x="577" y="604">not connected</text>
   </g>

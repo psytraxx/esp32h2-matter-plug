@@ -50,9 +50,9 @@ inline constexpr size_t METER_FILTER_DEPTH = 3;
 // of the stack up over USB with mains disconnected). Do not trust any
 // power/voltage/current reading from this firmware until they are re-derived
 // against a real load — see README.md's Verification section.
-inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_WATT = 775;   // 0.7752066 — PLACEHOLDER
-inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_VOLT = 8077;  // 8.0772724 — PLACEHOLDER
-inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_AMP = 91636;  // 91.6363602 — PLACEHOLDER
+inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_WATT = 775;  // 0.7752066 — PLACEHOLDER
+inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_VOLT = 8077; // 8.0772724 — PLACEHOLDER
+inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_AMP = 91636; // 91.6363602 — PLACEHOLDER
 
 // SEL polarity is device-specific: on the Uascent unit, SEL HIGH selects
 // voltage (the opposite of the HLW8012 convention). UNKNOWN for this CB2S —

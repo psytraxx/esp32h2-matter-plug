@@ -46,8 +46,8 @@ static void on_button_short_press(void)
     matter_button_toggle();
 }
 
-// Onboard BOOT button (GPIO9) — bench/dev convenience only. It's the XIAO
-// module's own button, unreachable once the plug is closed up, so it only
+// Onboard BOOT button (GPIO9) — bench/dev convenience only. It's the
+// SuperMini's own button, unreachable once the plug is closed up, so it only
 // gets the long-press factory-reset action; the plug's own button remains
 // the real user-facing control (short press too, via on_button_short_press).
 static void on_boot_button_long_press(void)
@@ -63,32 +63,11 @@ static void meter_poll_timer_cb(TimerHandle_t)
     MeterPoll();
 }
 
-// Routes the XIAO's radio to its onboard ceramic antenna rather than the
-// unpopulated U.FL connector. Runs before the Matter stack brings the radio up.
-static void rf_antenna_init()
-{
-    gpio_config_t cfg = {
-        .pin_bit_mask = (1ULL << PIN_RF_SWITCH_EN) | (1ULL << PIN_RF_ANT_SELECT),
-        .mode         = GPIO_MODE_OUTPUT,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
-    };
-    ESP_ERROR_CHECK(gpio_config(&cfg));
-    ESP_ERROR_CHECK(gpio_set_level(PIN_RF_SWITCH_EN, 0));   // enable RF switch
-    ESP_ERROR_CHECK(gpio_set_level(PIN_RF_ANT_SELECT, 0));  // onboard antenna
-
-    ESP_LOGI(TAG, "RF switch enabled, onboard antenna selected");
-}
-
 // One-time hardware and subsystem initialisation.
 static void app_init()
 {
     g_boot_events = xEventGroupCreate();
     configASSERT(g_boot_events);
-
-    // Before matter_setup() — the radio must not come up on the wrong antenna.
-    rf_antenna_init();
 
     status_led_init();
     status_led_set(STATUS_LED_BOOT);
@@ -169,7 +148,7 @@ extern "C" void app_main(void)
 {
     esp_log_level_set("BLE_INIT", ESP_LOG_WARN);
 
-    ESP_LOGI(TAG, "=== CB2S power plug (XIAO ESP32-C6) boot ===");
+    ESP_LOGI(TAG, "=== CB2S power plug (ESP32-H2 SuperMini) boot ===");
 
     app_init();
 
@@ -182,8 +161,8 @@ extern "C" void app_main(void)
 
     // Every boot, not just a freshly-commissioned one: an already-paired device
     // returns early from run_commissioning() and would otherwise sit on the
-    // boot indication forever. This also clears the commissioning blink's hold
-    // on the onboard LED, handing it back to relay state.
+    // boot indication forever. This also stops the commissioning blink and
+    // turns the onboard RGB LED green.
     status_led_set(STATUS_LED_OK);
 
     ESP_LOGI(TAG, "Ready — button toggles the relay, metering reports over Matter");

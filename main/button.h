@@ -3,7 +3,7 @@
 #include "driver/gpio.h"
 
 // Interrupt-driven button, generalized so it can drive either the CB2S
-// plug's own tactile switch (PIN_BUTTON) or the XIAO module's onboard BOOT
+// plug's own tactile switch (PIN_BUTTON) or the module's onboard BOOT
 // button (PIN_BOOT_BUTTON) — see board_pins.h for both.
 //
 // A hold of at least FACTORY_RESET_HOLD_MS fires on_long_press; a shorter

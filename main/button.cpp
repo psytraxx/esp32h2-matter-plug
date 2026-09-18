@@ -1,6 +1,6 @@
 // Originally ported near-verbatim from esp32c6-radar-demo-matter/main/button.cpp
 // for a single fixed pin; generalized into a per-instance struct so a second,
-// independent button (the XIAO's onboard BOOT button) could be added
+// independent button (the module's onboard BOOT button) could be added
 // alongside the plug's own tactile switch without sharing debounce/hold state.
 
 #include "button.h"
@@ -18,7 +18,7 @@
 static const char *TAG = "button";
 
 // Supports a small, fixed number of button_init() callers (currently two:
-// the plug's own button and the XIAO's onboard BOOT button).
+// the plug's own button and the module's onboard BOOT button).
 #define MAX_BUTTONS 2
 
 struct ButtonState

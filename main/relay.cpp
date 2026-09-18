@@ -42,7 +42,7 @@ void RelaySet(bool on)
 	sOn = on;
 
 	// The plug's own relay-state LED (if any) sits on the relay drive net in
-	// hardware and needs no GPIO. The XIAO's onboard LED does need driving,
+	// hardware and needs no GPIO. The onboard yellow LED does need driving,
 	// and shows relay state because the coil runs off a mains-derived rail:
 	// on USB-only bench power the relay will not click, so this LED is the
 	// only feedback that a controller toggle actually landed (see relay.h).
