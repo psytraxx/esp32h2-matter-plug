@@ -1,8 +1,10 @@
 # Name,   Type, SubType, Offset,   Size,     Flags
-# 4MB flash layout (XIAO ESP32-C6, 4 MB flash): single factory app, no OTA
-# slots + Matter NVS. Same layout as esp32c6-radar-demo-matter's
-# partitions_waveshare_c6.csv — the CB2S module this replaces had only 2 MB,
-# but that is a donor-module constraint, not a XIAO one.
+# 4MB flash layout (ESP32-H2 SuperMini, 4 MB flash): single factory app, no
+# OTA slots + Matter NVS. The CB2S module this replaces had only 2 MB, but
+# that is a donor-module constraint, not one of the replacement board's.
+# Confirm the flash size on your own unit (`esptool.py flash_id`) before
+# trusting this — SuperMini boards ship with 2 MB and 4 MB parts depending on
+# the batch, and a 2 MB unit will not hold the app0 region below.
 # otadata stays at the conventional 0xe000 because the flasher writes boot_app0.bin
 # there; left erased it makes the bootloader fall through to the factory app.
 nvs,      data, nvs,     0x9000,   0x5000,

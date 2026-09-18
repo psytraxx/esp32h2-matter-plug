@@ -48,7 +48,7 @@
 // and CHIP_DEVICE_CONFIG_TEST_SERIAL_NUMBER itself from those Kconfig values,
 // unconditionally and after this file is included — a #define here would collide
 // with that and is a hard error under -Werror.
-#define CHIP_DEVICE_CONFIG_DEFAULT_DEVICE_HARDWARE_VERSION_STRING "XIAO ESP32-C6 (CB2S retrofit)"
+#define CHIP_DEVICE_CONFIG_DEFAULT_DEVICE_HARDWARE_VERSION_STRING "ESP32-H2 SuperMini (CB2S retrofit)"
 #define CHIP_DEVICE_CONFIG_DEVICE_PRODUCT_NAME "CB2S Power Plug"
 
 // Firmware version string is deliberately NOT overridden: the SDK default is

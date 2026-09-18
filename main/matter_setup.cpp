@@ -16,7 +16,7 @@
 #include "relay.h"
 #include "status_led.h"
 
-// Thread (C6) transport: the CHIP OpenThread launcher asserts unless it has been
+// Thread transport: the CHIP OpenThread launcher asserts unless it has been
 // handed a platform config before esp_matter::start() brings the Thread stack up.
 // Same pattern as esp32c6-radar-demo-matter/main/matter_setup.cpp.
 #if CONFIG_OPENTHREAD_ENABLED

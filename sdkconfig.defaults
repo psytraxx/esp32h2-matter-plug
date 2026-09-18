@@ -1,11 +1,10 @@
-# sdkconfig defaults for the Seeed XIAO ESP32-C6 (ESP32-C6, 4 MB flash,
-# no PSRAM) replacing the CB2S module in a Tuya BL0937 energy-metering plug.
-# Lifted from the sibling esp32c6-radar-demo-matter project's sdkconfig.defaults
-# (same target, same Thread-only transport) with device identity and cluster
-# selection changed for this plug.
+# sdkconfig defaults for the ESP32-H2 SuperMini (ESP32-H2, 4 MB flash, no
+# PSRAM) replacing the CB2S module in a Tuya BL0937 energy-metering plug.
+# Transport is Matter over Thread, with BLE for commissioning only — the H2 is
+# 802.15.4 + BLE, so that is the only option.
 
 # Target / flash / partition table
-CONFIG_IDF_TARGET="esp32c6"
+CONFIG_IDF_TARGET="esp32h2"
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
@@ -19,9 +18,10 @@ CONFIG_MBEDTLS_HKDF_C=y
 CONFIG_COMPILER_OPTIMIZATION_SIZE=y
 CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE=n
 
-# CPU frequency: 80 MHz saves power (Matter stack is not CPU-bound).
-CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80=y
-CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=80
+# CPU frequency: 96 MHz, the ESP32-H2's maximum. A mains plug has no power
+# budget to protect, so take the full clock.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_96=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=96
 
 # BLE (commissioning only)
 CONFIG_BT_ENABLED=y
@@ -38,14 +38,12 @@ CONFIG_BT_NIMBLE_TRANSPORT_EVT_DISCARD_COUNT=4
 # Matter over Thread (BLE commissioning only).
 # Thread is the operational transport; BLE is torn down once the device joins a fabric.
 
-# Disable Wi-Fi — this board is Thread-only, even though the CB2S module it
-# replaces was Wi-Fi. These keys turn off Matter's use of Wi-Fi so the CHIP
-# stack no longer falls back to a (failing) Wi-Fi station connection loop.
-# Note: the IDF Wi-Fi driver itself cannot be dropped from the link here —
-# CONFIG_ESP_WIFI_ENABLED is a non-prompt symbol hardwired to y for any SoC
-# with a Wi-Fi radio, so there is no sdkconfig switch to compile it out.
+# Wi-Fi — the ESP32-H2 has no Wi-Fi radio at all (802.15.4 + BLE only), so
+# there is no driver to disable and no station-reconnect loop to suppress: IDF
+# simply never builds the Wi-Fi stack for this target. These keys stay only to
+# pin Matter's transport choice explicitly, so a future retarget can't silently
+# re-enable a Wi-Fi path.
 CONFIG_ENABLE_WIFI_STATION=n
-CONFIG_ESP_WIFI_SOFTAP_SUPPORT=n
 CONFIG_ENABLE_WIFI_AP=n
 
 # Thread / OpenThread (FTD — Full Thread Device, always on, no ICD/sleep).
@@ -74,14 +72,14 @@ CONFIG_LWIP_MULTICAST_PING=y
 CONFIG_USE_MINIMAL_MDNS=n
 CONFIG_MBEDTLS_SSL_PROTO_DTLS=y
 
-# Power management disabled outright. Mains power means there is nothing to
-# save it for, and on the ESP32-C6 even DFS-only PM (no light sleep) destabilises
-# the 802.15.4 radio once BLE deinits after commissioning: the Thread link goes
-# NoAck, the node detaches from its parent and forms its own partition as leader,
-# which looks to the Border Router like the device simply vanished. The giveaway
-# is "phy: phy wait timeout" in the log shortly after "BLE deinit successful".
+# Power management disabled outright. This is a mains-powered plug, so there is
+# nothing to save it for. Beware that enabling even DFS-only PM (no light
+# sleep) has been seen to destabilise the 802.15.4 radio on ESP32 parts once
+# BLE deinits after commissioning: the Thread link goes NoAck, the node
+# detaches from its parent and forms its own partition as leader, which looks
+# to the Border Router like the device simply vanished. The giveaway is
+# "phy: phy wait timeout" shortly after "BLE deinit successful".
 CONFIG_PM_ENABLE=n
-CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160=y
 
 CONFIG_ENABLE_EXTENDED_DISCOVERY=y
 

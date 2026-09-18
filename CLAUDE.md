@@ -1,4 +1,4 @@
-# openbeken-matter
+# esp32h2-matter-plug
 
 Two things live in this repo:
 
@@ -6,8 +6,13 @@ Two things live in this repo:
    (BK7231N) energy-metering smart plug — measured pinout, BL0937
    calibration block, flash layout, stock Tuya schema.
 2. **A Matter firmware** (`main/`, ESP-IDF) that replaces the CB2S module
-   with a Seeed Studio XIAO ESP32-C6, turning the plug into an On/Off
-   Plug-in Unit with live power/energy metering over Matter-over-Thread.
+   with an ESP32-H2 SuperMini, turning the plug into an On/Off Plug-in Unit
+   with live power/energy metering over Matter-over-Thread.
+
+   When porting anything from the sibling repos below, check it against
+   `main/board_pins.h` and `doc/h2-supermini-pinmap.md` — neither ancestor
+   runs on this SoC, so their pins, console UART, and radio setup do not
+   carry over.
 
 The firmware is a **port**, not a from-scratch build. Its two ancestors:
 
@@ -18,13 +23,15 @@ The firmware is a **port**, not a from-scratch build. Its two ancestors:
   plug (Uascent UAM023-based, not this CB2S one).
 - **`esp32c6-radar-demo-matter`** (sibling repo, ESP-IDF/esp_matter) — the
   *platform*. Commissioning flow, button handling, sdkconfig, build/flash
-  workflow, the `tools/spake2p_verifier.py` pairing-code generator.
+  workflow, the `tools/spake2p_verifier.py` pairing-code generator. Note that
+  repo is an ESP32-C6 project, so its GPIO and radio specifics do not
+  transfer to this one even though the esp_matter scaffolding does.
 
 ## Build
 
 ```sh
 source ~/.espressif/v6.0.3/esp-idf/export.sh
-idf.py set-target esp32c6
+idf.py set-target esp32h2
 idf.py build
 idf.py flash monitor
 ```
@@ -43,7 +50,8 @@ python3 tools/spake2p_verifier.py <passcode>
 ## Hardware — pin roles are NOT the same as the sibling project
 
 **Do not port `uascent-matter`'s board overlay or pin numbers.** The two
-donor plugs place BL0937/relay/LED on almost inverted pins:
+donor plugs place BL0937/relay/LED on almost inverted pins (the left two
+columns are the *plug-side* nets, unchanged by the board swap):
 
 | Signal | Uascent (UAM023, sibling repo) | This plug (CB2S) |
 |---|---|---|
@@ -54,8 +62,16 @@ donor plugs place BL0937/relay/LED on almost inverted pins:
 | LED | P7 | **P8** |
 | Button | RX1 (P10) | RX1 (P10) — same convention |
 
-`main/board_pins.h` is the single source of truth for this plug's XIAO-side
-GPIO assignments; the pad-level mapping is in README.md's "Wiring" section.
+`main/board_pins.h` is the single source of truth for this plug's
+SuperMini-side GPIO assignments; the pad-level mapping is in README.md's
+"Wiring" section, and the replacement board's own pinout is in
+`doc/h2-supermini-pinmap.md`.
+
+The SuperMini labels its headers with raw GPIO numbers, so a pad's silkscreen
+number *is* the GPIO number. Pins avoided, and why: GPIO23/24 are the ESP32-H2's console UART0
+(RX/TX, silkscreened `RX`/`TX`), GPIO26/27 are `USB_D-`/`USB_D+`, and GPIO2/3/
+8/9/25 are strapping pins. GPIO8 and GPIO9 are used anyway, but only as the
+module's own RGB LED and BOOT button, which the module already wires that way.
 
 **`P10` is the pad silkscreened `RX1` on this module** — confirmed against
 the plug's schematic, not a rework or jumper. A reader looking at the CB2S
@@ -115,8 +131,8 @@ these are re-derived on the bench (README.md's Verification checklist).
 
 ## Mains safety
 
-The BL0937's ground sits at mains potential. Never connect USB to the XIAO
-while the plug is connected to mains. Develop with the board USB-powered
+The BL0937's ground sits at mains potential. Never connect USB to the
+SuperMini while the plug is connected to mains. Develop with the board USB-powered
 and mains disconnected — everything except real power readings works that
 way.
 
@@ -132,3 +148,27 @@ builds the data model programmatically from the `config_t` structs and
 Transport is **Matter over Thread**, FTD (always-on, no ICD/sleep) — see
 `sdkconfig.defaults`'s comment for why this differs from the nRF sibling's
 MTD+ICD choice. Requires a Thread Border Router on the network to commission.
+The ESP32-H2 has no Wi-Fi radio at all, so Thread is not a preference here but
+the only option — there is no Wi-Fi fallback to configure or disable.
+
+## Onboard LEDs
+
+The SuperMini has two software-drivable LEDs, and the firmware gives each its
+own job rather than time-sharing one (see `main/status_led.h`):
+
+- **RGB LED (GPIO8)** — Matter network state as colour: white/boot,
+  blue-blinking/commissioning, green/paired, red/error. A single WS2812 pixel
+  driven over RMT via the `espressif/led_strip` managed component. Init failure
+  is logged and tolerated, not fatal — it costs only the bench indication.
+- **Yellow LED (GPIO13)** — relay state. This matters on USB-only bench power,
+  where the relay coil (mains-derived rail) will not physically click, so the
+  LED is the only confirmation a controller toggle landed.
+
+The plug's own front-panel LED (`PIN_LED`) still carries network state too, and
+is the only one of the three visible once the enclosure is closed. A third
+onboard LED, the battery-charge indicator, is wired to the charger IC and has
+no GPIO.
+
+There is **no RF antenna switch** on this board — single PCB trace antenna, no
+U.FL, and no switch-control GPIOs. There is nothing to select in software, so
+do not add an antenna-init step.

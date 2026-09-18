@@ -5,7 +5,7 @@
 // (PIN_RELAY in board_pins.h).
 //
 // Note the relay coil is driven from a mains-derived rail, not from the
-// XIAO's 3.3 V. When the board is bench-powered over USB with mains
+// module's 3.3 V. When the board is bench-powered over USB with mains
 // disconnected, the GPIO will toggle correctly but the relay may not
 // physically click. That is expected, not a fault; verify with a meter/scope
 // on the pad rather than by ear. See README.md's Verification section.

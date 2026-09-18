@@ -1,3 +1,5 @@
 dependencies:
   idf: ">=6.0.3,<6.1.0"
   espressif/esp_matter: "1.6.0"
+  # Onboard WS2812 RGB status LED on the ESP32-H2 SuperMini (PIN_RGB_LED).
+  espressif/led_strip: "^3.0.3"
