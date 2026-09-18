@@ -50,9 +50,9 @@ inline constexpr size_t METER_FILTER_DEPTH = 3;
 // of the stack up over USB with mains disconnected). Do not trust any
 // power/voltage/current reading from this firmware until they are re-derived
 // against a real load — see README.md's Verification section.
-inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_WATT = 775;   // 0.7752066 — PLACEHOLDER
-inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_VOLT = 8077;  // 8.0772724 — PLACEHOLDER
-inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_AMP = 91636;  // 91.6363602 — PLACEHOLDER
+inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_WATT = 775;  // 0.7752066 — PLACEHOLDER
+inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_VOLT = 8077; // 8.0772724 — PLACEHOLDER
+inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_AMP = 91636; // 91.6363602 — PLACEHOLDER
 
 // SEL polarity is device-specific: on the Uascent unit, SEL HIGH selects
 // voltage (the opposite of the HLW8012 convention). UNKNOWN for this CB2S —
@@ -61,6 +61,25 @@ inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_AMP = 91636;  // 91.6363
 // decide the boot phase and the meaning of each SEL level; get it wrong and
 // every V/I reading in Home Assistant is silently swapped.
 inline constexpr bool METER_SEL_HIGH_SELECTS_VOLTAGE = true; // UNVERIFIED — confirm on bench
+
+// Bring-up aid: fake meter readings.
+//
+// When enabled, MeterPoll() ignores the BL0937 entirely (no pulse counts, no
+// SEL muxing, no calibration divisors) and pushes the fixed values below into
+// PowerMeasurementUpdate() at the normal poll rate. That isolates the Matter
+// half of the chain -- EPM/EEM cluster registration, attribute reporting,
+// subscriptions, what the controller renders -- from the hardware half.
+//
+// If wattage still does not appear in the controller with this on, the fault
+// is in the Matter path, not the BL0937 wiring or calibration.
+//
+// SET THIS BACK TO false BEFORE ANY REAL MEASUREMENT. The firmware logs a
+// warning on every fake sample so it cannot be left on unnoticed.
+inline constexpr bool METER_FAKE_READINGS = false;
+
+inline constexpr int64_t METER_FAKE_ACTIVE_POWER_MW = 123'000; // 123 W
+inline constexpr int64_t METER_FAKE_RMS_VOLTAGE_MV = 230'000;  // 230 V
+inline constexpr int64_t METER_FAKE_RMS_CURRENT_MA = 535;      // 0.535 A
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Over-power protection — the one safety behaviour that has to be local

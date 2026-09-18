@@ -202,6 +202,19 @@ void MeterInit(void)
 
 void MeterPoll(void)
 {
+	/* Bring-up short-circuit -- see METER_FAKE_READINGS in app_config.h.
+	 * Returns before any pulse counter, filter or SEL flip is touched, so
+	 * what reaches Matter depends on nothing the BL0937 does. Over-power
+	 * protection is skipped along with it: it would be acting on a number
+	 * that has no relationship to the load. */
+	if (METER_FAKE_READINGS) {
+		ESP_LOGW(TAG, "FAKE readings (METER_FAKE_READINGS): %" PRId64 " mW, %" PRId64 " mV, %" PRId64 " mA",
+			 METER_FAKE_ACTIVE_POWER_MW, METER_FAKE_RMS_VOLTAGE_MV, METER_FAKE_RMS_CURRENT_MA);
+		PowerMeasurementUpdate(METER_FAKE_ACTIVE_POWER_MW, METER_FAKE_RMS_VOLTAGE_MV,
+				       METER_FAKE_RMS_CURRENT_MA);
+		return;
+	}
+
 	const int64_t nowMs = esp_timer_get_time() / 1000;
 	const int64_t windowMs = sLastPollMs ? (nowMs - sLastPollMs) : 0;
 	sLastPollMs = nowMs;

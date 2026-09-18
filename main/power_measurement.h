@@ -25,6 +25,25 @@
 
 #include <cstdint>
 
+/* The ElectricalPowerMeasurement delegate, for matter_setup.cpp to hand to
+ * cluster::electrical_power_measurement::create() as config_t::delegate.
+ *
+ * Must be called BEFORE esp_matter::start(), i.e. during create_endpoints():
+ * esp_matter stores this pointer on the cluster and passes it to
+ * ElectricalPowerMeasurementDelegateInitCB once the data model loads, which
+ * is what constructs and Init()s the CHIP Instance. The returned object has
+ * static storage duration, so it is valid from first call until reboot; this
+ * file deliberately does not construct an Instance itself (esp_matter owns
+ * that one, and a second would double-register the same
+ * AttributeAccessInterface).
+ *
+ * Returns void* because that is config_t::delegate's type; the pointee is a
+ * chip::app::Clusters::ElectricalPowerMeasurement::Delegate. */
+void *PowerMeasurementGetDelegate(void);
+
+/* Must run AFTER esp_matter::start(), unlike PowerMeasurementGetDelegate():
+ * it checks the clusters esp_matter's init callbacks have by then built, and
+ * sets EEM's accuracy on the resulting instance. */
 CHIP_ERROR PowerMeasurementInit(chip::EndpointId endpoint);
 
 /* Pushes one reading into both clusters: EPM's attributes through the

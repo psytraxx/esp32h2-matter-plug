@@ -225,15 +225,57 @@ static esp_err_t create_endpoints(esp_matter::node_t *node)
     }
     s_ep_plug = endpoint::get_id(ep);
 
-    // ElectricalPowerMeasurement is wired entirely through the CHIP SDK's own
-    // cluster API (power_measurement.cpp's Instance/Delegate) -- its Init()
-    // self-registers directly with the data-model provider registry, with no
-    // esp_matter::cluster::electrical_power_measurement helper involved at
-    // all. Deferred until after esp_matter::start() below: Instance::Init()
-    // touches the attribute/reporting engine, which is only valid once the
-    // data model has loaded.
+    // Both measurement clusters are created here, through esp_matter's own
+    // cluster helpers. Neither self-registers: a CHIP Instance whose Init()
+    // runs without a matching esp_matter cluster_t on the endpoint registers
+    // an AttributeAccessInterface for a cluster that is absent from the
+    // endpoint's descriptor ServerList -- the controller never discovers it,
+    // every MatterReportingAttributeChangeCallback() marks an attribute no
+    // subscriber knows about, and nothing errors. (That is precisely the bug
+    // that made this plug report no wattage: EPM had the Instance but no
+    // cluster::electrical_power_measurement::create() call.) The Zephyr
+    // sibling declares both clusters on endpoint 1 in its ZAP file; these
+    // two create() calls are this project's programmatic equivalent.
     //
-    // ElectricalEnergyMeasurement is different: esp_matter needs its own
+    // ElectricalPowerMeasurement: passing the delegate in config_t is what
+    // arms ElectricalPowerMeasurementDelegateInitCB, which constructs the
+    // ElectricalPowerMeasurement::Instance, calls Init() on it once the data
+    // model has loaded, and owns its lifetime via a shutdown callback. So
+    // power_measurement.cpp must NOT construct an Instance of its own --
+    // two Instances would double-register the same AttributeAccessInterface.
+    //
+    // The optional-attribute bitmask that callback passes to the Instance is
+    // derived from which optional attributes actually exist on the cluster
+    // (get_electrical_power_measurement_enabled_optional_attributes() walks
+    // them with endpoint::is_attribute_enabled()). Creating exactly
+    // rms_voltage and rms_current is therefore how this endpoint declares
+    // "AC RMS, nothing else" -- matching the sibling's .matter, and matching
+    // the delegate's non-null getters. Do not swap these for
+    // cluster::electrical_power_measurement::create_optional_attributes():
+    // that creates all thirteen optionals, including the ones
+    // PlugPowerDelegate deliberately returns NullNullable for.
+    {
+        using namespace chip::app::Clusters::ElectricalPowerMeasurement;
+        cluster::electrical_power_measurement::config_t epm_cfg = {};
+        epm_cfg.feature_flags = cluster::electrical_power_measurement::feature::alternating_current::get_id();
+        epm_cfg.delegate = PowerMeasurementGetDelegate();
+
+        cluster_t *epm = cluster::electrical_power_measurement::create(ep, &epm_cfg, CLUSTER_FLAG_SERVER);
+        if (!epm)
+        {
+            ESP_LOGE(TAG, "electrical_power_measurement cluster create failed");
+            return ESP_FAIL;
+        }
+
+        if (!cluster::electrical_power_measurement::attribute::create_rms_voltage(epm, nullable<int64_t>()) ||
+            !cluster::electrical_power_measurement::attribute::create_rms_current(epm, nullable<int64_t>()))
+        {
+            ESP_LOGE(TAG, "electrical_power_measurement RMS attribute create failed");
+            return ESP_FAIL;
+        }
+    }
+
+    // ElectricalEnergyMeasurement: esp_matter needs its own
     // cluster_t on this endpoint (electrical_energy_measurement::create()
     // below) so ESPMatterElectricalEnergyMeasurementClusterServerInitCallback
     // (registered as that cluster's init callback, fired automatically once

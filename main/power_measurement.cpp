@@ -19,7 +19,6 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 
-#include <memory>
 
 static const char *TAG = "power_measurement";
 
@@ -158,8 +157,16 @@ private:
 	DataModel::Nullable<int64_t> mRmsCurrentMa;
 };
 
-std::unique_ptr<PlugPowerDelegate> sDelegate;
-std::unique_ptr<Instance> sInstance;
+/* Static storage duration, not a unique_ptr: matter_setup.cpp hands this
+ * pointer to esp_matter during create_endpoints() and esp_matter keeps it for
+ * the life of the cluster, so it must outlive any scope here.
+ *
+ * There is deliberately no Instance member beside it. esp_matter's
+ * ElectricalPowerMeasurementDelegateInitCB constructs the
+ * ElectricalPowerMeasurement::Instance from this delegate, calls Init() on it
+ * and owns it through a shutdown callback -- see the long comment in
+ * matter_setup.cpp's create_endpoints(). */
+PlugPowerDelegate sDelegate;
 
 EndpointId sEndpoint;
 bool sHaveLastSample;
@@ -269,26 +276,34 @@ void ReportIfMoved(int64_t value, int64_t *reported, int64_t deadband, Attribute
 
 } /* namespace */
 
+void *PowerMeasurementGetDelegate(void)
+{
+	return &sDelegate;
+}
+
 CHIP_ERROR PowerMeasurementInit(EndpointId endpoint)
 {
 	sEndpoint = endpoint;
 
-	sDelegate = std::make_unique<PlugPowerDelegate>();
-	sInstance = std::make_unique<Instance>(
-		endpoint, *sDelegate, BitMask<Feature>(Feature::kAlternatingCurrent),
-		BitMask<OptionalAttributes>(OptionalAttributes::kOptionalAttributeRMSVoltage,
-					    OptionalAttributes::kOptionalAttributeRMSCurrent));
-
-	CHIP_ERROR err = sInstance->Init();
-	if (err != CHIP_NO_ERROR) {
-		ESP_LOGE(TAG, "EPM Instance init failed: %" CHIP_ERROR_FORMAT, err.Format());
-		sInstance.reset();
-		sDelegate.reset();
-		return err;
+	/* Neither cluster is constructed here -- both are built by esp_matter's
+	 * init callbacks, from the cluster::*::create() calls in
+	 * matter_setup.cpp's create_endpoints(). This function only verifies
+	 * that happened and configures what is left.
+	 *
+	 * EPM is checked through the endpoint's own descriptor rather than a
+	 * GetClusterInstance()-style accessor (EPM's integration header exposes
+	 * none). That check is the point: a missing EPM cluster is exactly the
+	 * failure this firmware shipped with -- the Instance existed and Init()
+	 * returned CHIP_NO_ERROR, but with no cluster on the endpoint the
+	 * ServerList never advertised 0x0090, so no controller ever subscribed
+	 * and every reading was dropped in silence. Fail loudly instead. */
+	if (!emberAfContainsServer(endpoint, ElectricalPowerMeasurement::Id)) {
+		ESP_LOGE(TAG, "ElectricalPowerMeasurement cluster not registered on endpoint %u -- "
+			      "did create_endpoints() add it?", endpoint);
+		return CHIP_ERROR_NOT_FOUND;
 	}
 
-	/* EEM's cluster instance is NOT constructed here, unlike EPM's Instance
-	 * above. Unlike uascent-matter's nRF SDK snapshot (which built EEM by
+	/* Unlike uascent-matter's nRF SDK snapshot (which built EEM by
 	 * hand-constructing ElectricalEnergyMeasurementAttrAccess), this
 	 * esp_matter/CHIP snapshot doesn't compile CHIP's own
 	 * ElectricalEnergyMeasurementAttrAccess shim into the link at all --
@@ -339,7 +354,7 @@ CHIP_ERROR PowerMeasurementInit(EndpointId endpoint)
 		DataModel::List<const ElectricalEnergyMeasurement::Structs::MeasurementAccuracyRangeStruct::Type>(
 			kEnergyRanges);
 
-	err = ElectricalEnergyMeasurement::SetMeasurementAccuracy(endpoint, energyAccuracy);
+	CHIP_ERROR err = ElectricalEnergyMeasurement::SetMeasurementAccuracy(endpoint, energyAccuracy);
 	if (err != CHIP_NO_ERROR) {
 		ESP_LOGE(TAG, "EEM accuracy set failed: %" CHIP_ERROR_FORMAT, err.Format());
 		return err;
@@ -352,10 +367,6 @@ CHIP_ERROR PowerMeasurementInit(EndpointId endpoint)
 
 void PowerMeasurementUpdate(int64_t activePowerMw, int64_t rmsVoltageMv, int64_t rmsCurrentMa)
 {
-	if (!sDelegate) {
-		return;
-	}
-
 	/* Called from the FreeRTOS timer service task (bl0937.cpp's MeterPoll()
 	 * via app_main.cpp's meter_poll_timer_cb), not the CHIP/Matter task.
 	 * Every call below eventually reaches the data-model provider
@@ -367,7 +378,7 @@ void PowerMeasurementUpdate(int64_t activePowerMw, int64_t rmsVoltageMv, int64_t
 	 * init time. */
 	chip::DeviceLayer::StackLock lock;
 
-	sDelegate->Set(activePowerMw, rmsVoltageMv, rmsCurrentMa);
+	sDelegate.Set(activePowerMw, rmsVoltageMv, rmsCurrentMa);
 
 	ReportIfMoved(activePowerMw, &sReportedActivePowerMw, kActivePowerDeadbandMw,
 		      Attributes::ActivePower::Id);
