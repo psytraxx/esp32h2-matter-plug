@@ -11,8 +11,8 @@
 //      paired / OK    follows the relay — on when the load is on
 //      error          off (with the onboard RGB red)
 //
-//    The handover happens at STATUS_LED_OK and is tracked by
-//    sRelayOwnsPlugLed in the .cpp. The reasoning: before pairing there is no
+//    The handover happens at STATUS_LED_OK; RelayOwnsPlugLed() in the .cpp
+//    derives it from the current state. The reasoning: before pairing there is no
 //    meaningful relay state to show (the relay is held open through boot, and
 //    on USB-only bench power the coil cannot click at all) and a pairing cue
 //    is the only thing a user can act on; afterwards, relay state is what a

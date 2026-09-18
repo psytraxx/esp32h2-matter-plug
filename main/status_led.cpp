@@ -8,6 +8,7 @@
 #include "led_strip.h"
 
 #include "board_pins.h"
+#include "relay.h"
 
 static const char *TAG = "status_led";
 
@@ -15,24 +16,6 @@ namespace
 {
 TimerHandle_t sBlinkTimer;
 bool sBlinkOn;
-
-/* Who owns PIN_LED right now.
- *
- * PIN_LED is the only indicator visible with the enclosure closed, so the two
- * things worth showing on it compete for it. The split is by phase: until the
- * plug is paired there is no meaningful relay state to show (the relay is
- * held open through boot, and on USB-only bench power the coil cannot click
- * at all), and a pairing cue is the only thing a user can act on -- so the
- * network indication takes the LED. Once paired, relay state is what the LED
- * is for, the way a mains plug's own indicator behaves.
- *
- * sRelayOwnsPlugLed latches at STATUS_LED_OK and is what keeps the blink
- * timer and status_led_set() from fighting RelaySet() for the pin afterwards.
- * sRelayOn is remembered across the handover so the LED can be brought to the
- * correct level the moment ownership changes, without waiting for the next
- * relay toggle. */
-bool sRelayOwnsPlugLed;
-bool sRelayOn;
 
 led_strip_handle_t sRgb;
 
@@ -91,10 +74,26 @@ void SetRgb(bool on)
     led_strip_refresh(sRgb);
 }
 
+/* Which indication owns PIN_LED, the only LED visible with the enclosure
+ * closed. Until the plug is paired there is no meaningful relay state to show
+ * (the relay is held open through boot, and on USB-only bench power the coil
+ * cannot click at all) and a pairing cue is the only thing a user can act on,
+ * so the network indication takes the LED. Once paired, relay state is what
+ * the LED is for, the way a mains plug's own indicator behaves. Error takes it
+ * back so a relay that happens to be on cannot mask the error cue.
+ *
+ * Derived from sState rather than latched separately: status_led_set() assigns
+ * sState before its switch, so this is already correct by the time the OK case
+ * calls SetLevel(), and a future state cannot forget to update it. */
+bool RelayOwnsPlugLed(void)
+{
+    return sState == STATUS_LED_OK;
+}
+
 void BlinkTimerCallback(TimerHandle_t)
 {
     sBlinkOn = !sBlinkOn;
-    if (!sRelayOwnsPlugLed)
+    if (!RelayOwnsPlugLed())
     {
         SetLevel(sBlinkOn);
     }
@@ -165,17 +164,15 @@ void status_led_init(void)
 
 void status_led_set_relay(bool on)
 {
-    sRelayOn = on;
-
     // The onboard yellow LED shows relay state unconditionally, in every
     // phase: it has an LED to itself and nothing else competes for it.
     SetOnboardLevel(on);
 
     // The plug's own LED only follows the relay once the network indication
-    // has handed it over (see sRelayOwnsPlugLed). Before that, a relay change
+    // has handed it over (see RelayOwnsPlugLed()). Before that, a relay change
     // updates the remembered state above but leaves the pin alone, so it does
     // not punch a hole in the commissioning blink.
-    if (sRelayOwnsPlugLed)
+    if (RelayOwnsPlugLed())
     {
         SetLevel(on);
     }
@@ -189,13 +186,11 @@ void status_led_set(status_led_state_t state)
     {
     case STATUS_LED_BOOT:
         StopBlink();
-        sRelayOwnsPlugLed = false;
         SetLevel(true);
         SetRgb(true);
         break;
     case STATUS_LED_COMMISSIONING:
         sBlinkOn = false;
-        sRelayOwnsPlugLed = false;
         SetLevel(false);
         SetRgb(false);
         if (sBlinkTimer)
@@ -205,10 +200,12 @@ void status_led_set(status_led_state_t state)
         break;
     case STATUS_LED_OK:
         StopBlink();
-        // Hand PIN_LED to the relay and bring it straight to the current
-        // relay level, rather than leaving it lit until the next toggle.
-        sRelayOwnsPlugLed = true;
-        SetLevel(sRelayOn);
+        // PIN_LED now belongs to the relay (RelayOwnsPlugLed()); bring it
+        // straight to the current relay level rather than leaving it lit
+        // until the next toggle. RelayIsOn() is relay.cpp's own record of
+        // what was last commanded -- documented to read false before the
+        // first RelaySet(), which is the right answer during boot too.
+        SetLevel(RelayIsOn());
         SetRgb(true);
         break;
     case STATUS_LED_ERROR:
@@ -216,7 +213,6 @@ void status_led_set(status_led_state_t state)
         // Error reclaims the LED from the relay: a dark plug LED while the
         // RGB is red is the error cue, and it must not be masked by the relay
         // happening to be on.
-        sRelayOwnsPlugLed = false;
         SetLevel(false);
         SetRgb(true); // red stays lit — the plug's LED going dark is the "error" cue
         break;

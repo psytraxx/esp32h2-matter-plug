@@ -231,9 +231,7 @@ static esp_err_t create_endpoints(esp_matter::node_t *node)
     // an AttributeAccessInterface for a cluster that is absent from the
     // endpoint's descriptor ServerList -- the controller never discovers it,
     // every MatterReportingAttributeChangeCallback() marks an attribute no
-    // subscriber knows about, and nothing errors. (That is precisely the bug
-    // that made this plug report no wattage: EPM had the Instance but no
-    // cluster::electrical_power_measurement::create() call.) The Zephyr
+    // subscriber knows about, and nothing errors. The Zephyr
     // sibling declares both clusters on endpoint 1 in its ZAP file; these
     // two create() calls are this project's programmatic equivalent.
     //
@@ -250,12 +248,10 @@ static esp_err_t create_endpoints(esp_matter::node_t *node)
     // them with endpoint::is_attribute_enabled()). Creating exactly
     // rms_voltage and rms_current is therefore how this endpoint declares
     // "AC RMS, nothing else" -- matching the sibling's .matter, and matching
-    // the delegate's non-null getters. Do not swap these for
-    // cluster::electrical_power_measurement::create_optional_attributes():
-    // that creates all thirteen optionals, including the ones
-    // PlugPowerDelegate deliberately returns NullNullable for.
+    // the delegate's non-null getters. Adding a third here without also
+    // giving PlugPowerDelegate a non-null getter for it would advertise an
+    // attribute that always reads null.
     {
-        using namespace chip::app::Clusters::ElectricalPowerMeasurement;
         cluster::electrical_power_measurement::config_t epm_cfg = {};
         epm_cfg.feature_flags = cluster::electrical_power_measurement::feature::alternating_current::get_id();
         epm_cfg.delegate = PowerMeasurementGetDelegate();
@@ -287,7 +283,6 @@ static esp_err_t create_endpoints(esp_matter::node_t *node)
     // and declaring those features would make CumulativeEnergyExported /
     // PeriodicEnergyImported mandatory attributes this endpoint doesn't have.
     {
-        using namespace chip::app::Clusters::ElectricalEnergyMeasurement;
         cluster::electrical_energy_measurement::config_t eem_cfg = {};
         eem_cfg.feature_flags = cluster::electrical_energy_measurement::feature::imported_energy::get_id() |
                                  cluster::electrical_energy_measurement::feature::cumulative_energy::get_id();

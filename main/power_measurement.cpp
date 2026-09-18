@@ -1,7 +1,6 @@
 #include "power_measurement.h"
 
 #include <app-common/zap-generated/cluster-objects.h>
-#include <app/AttributeAccessInterface.h>
 // esp_matter's own EEM integration header, not CHIP's
 // electrical-energy-measurement-server.h -- this build doesn't compile CHIP's
 // ElectricalEnergyMeasurementAttrAccess (see the long comment in
@@ -11,14 +10,15 @@
 #include <app/clusters/electrical-power-measurement-server/electrical-power-measurement-server.h>
 #include <app/reporting/reporting.h>
 #include <app/server/Server.h>
-#include <app/util/attribute-storage.h>
-#include <lib/support/BitMask.h>
 #include <platform/CHIPDeviceLayer.h>
 #include <platform/KeyValueStoreManager.h>
+
+#include "esp_matter.h"
 
 #include "esp_log.h"
 #include "esp_timer.h"
 
+#include <inttypes.h>
 
 static const char *TAG = "power_measurement";
 
@@ -290,17 +290,30 @@ CHIP_ERROR PowerMeasurementInit(EndpointId endpoint)
 	 * matter_setup.cpp's create_endpoints(). This function only verifies
 	 * that happened and configures what is left.
 	 *
-	 * EPM is checked through the endpoint's own descriptor rather than a
-	 * GetClusterInstance()-style accessor (EPM's integration header exposes
-	 * none). That check is the point: a missing EPM cluster is exactly the
-	 * failure this firmware shipped with -- the Instance existed and Init()
-	 * returned CHIP_NO_ERROR, but with no cluster on the endpoint the
-	 * ServerList never advertised 0x0090, so no controller ever subscribed
-	 * and every reading was dropped in silence. Fail loudly instead. */
-	if (!emberAfContainsServer(endpoint, ElectricalPowerMeasurement::Id)) {
-		ESP_LOGE(TAG, "ElectricalPowerMeasurement cluster not registered on endpoint %u -- "
-			      "did create_endpoints() add it?", endpoint);
-		return CHIP_ERROR_NOT_FOUND;
+	 * The presence check is the point, and it is a list rather than a
+	 * per-cluster guard so that adding a cluster to this endpoint means
+	 * adding one id here, not remembering to hand-write a fourth check. A
+	 * missing cluster is exactly the failure this firmware shipped with:
+	 * EPM's Instance existed and Init() returned CHIP_NO_ERROR, but with no
+	 * cluster_t on the endpoint the ServerList never advertised 0x0090, so
+	 * no controller subscribed and every reading was dropped in silence.
+	 * Fail loudly instead.
+	 *
+	 * cluster::get() is esp_matter's own lookup -- the same call its
+	 * DelegateInitCB uses to find these clusters -- so this asks the
+	 * question at the layer that answers it, rather than through CHIP's
+	 * ember storage underneath. */
+	static constexpr ClusterId kRequiredServerClusters[] = {
+		ElectricalPowerMeasurement::Id,
+		ElectricalEnergyMeasurement::Id,
+	};
+
+	for (ClusterId clusterId : kRequiredServerClusters) {
+		if (esp_matter::cluster::get(endpoint, clusterId) == nullptr) {
+			ESP_LOGE(TAG, "Cluster 0x%04" PRIX32 " not registered on endpoint %u -- "
+				      "did create_endpoints() add it?", clusterId, endpoint);
+			return CHIP_ERROR_NOT_FOUND;
+		}
 	}
 
 	/* Unlike uascent-matter's nRF SDK snapshot (which built EEM by
@@ -322,13 +335,15 @@ CHIP_ERROR PowerMeasurementInit(EndpointId endpoint)
 	 * cumulative energy) are set on cluster::electrical_energy_measurement::
 	 * config_t.feature_flags at create() time, not here.
 	 *
-	 * Fail loudly if the endpoint config in matter_setup.cpp forgot to add
-	 * the cluster -- silent failure here means every energy read returns
-	 * Status::Failure from then on, exactly the trap the comment above used
-	 * to warn about for the old AttrAccess path. */
+	 * This is a different assertion from the kRequiredServerClusters loop
+	 * above, not a duplicate of it: that loop proves esp_matter's cluster_t
+	 * exists, this proves the init callback actually built the CHIP cluster
+	 * behind it. Only the latter is what the Notify/SetAccuracy calls below
+	 * need, and silent failure here means every energy read returns
+	 * Status::Failure from then on. */
 	if (ElectricalEnergyMeasurement::GetClusterInstance(endpoint) == nullptr) {
-		ESP_LOGE(TAG, "ElectricalEnergyMeasurement cluster not registered on endpoint %u -- "
-			      "did create_endpoints() add it?", endpoint);
+		ESP_LOGE(TAG, "ElectricalEnergyMeasurement cluster instance missing on endpoint %u -- "
+			      "cluster_t exists but esp_matter's init callback did not construct it", endpoint);
 		return CHIP_ERROR_NOT_FOUND;
 	}
 

@@ -62,25 +62,6 @@ inline constexpr int64_t METER_MILLI_COUNTS_PER_SEC_PER_AMP = 91636; // 91.63636
 // every V/I reading in Home Assistant is silently swapped.
 inline constexpr bool METER_SEL_HIGH_SELECTS_VOLTAGE = true; // UNVERIFIED — confirm on bench
 
-// Bring-up aid: fake meter readings.
-//
-// When enabled, MeterPoll() ignores the BL0937 entirely (no pulse counts, no
-// SEL muxing, no calibration divisors) and pushes the fixed values below into
-// PowerMeasurementUpdate() at the normal poll rate. That isolates the Matter
-// half of the chain -- EPM/EEM cluster registration, attribute reporting,
-// subscriptions, what the controller renders -- from the hardware half.
-//
-// If wattage still does not appear in the controller with this on, the fault
-// is in the Matter path, not the BL0937 wiring or calibration.
-//
-// SET THIS BACK TO false BEFORE ANY REAL MEASUREMENT. The firmware logs a
-// warning on every fake sample so it cannot be left on unnoticed.
-inline constexpr bool METER_FAKE_READINGS = false;
-
-inline constexpr int64_t METER_FAKE_ACTIVE_POWER_MW = 123'000; // 123 W
-inline constexpr int64_t METER_FAKE_RMS_VOLTAGE_MV = 230'000;  // 230 V
-inline constexpr int64_t METER_FAKE_RMS_CURRENT_MA = 535;      // 0.535 A
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Over-power protection — the one safety behaviour that has to be local
 // rather than waiting for a controller to notice an overload.

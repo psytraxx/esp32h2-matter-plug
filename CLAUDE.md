@@ -85,10 +85,33 @@ because that project's OccupancySensing cluster keeps its setter private
 (`attribute::update()` silently no-ops for a registered cluster's reads).
 
 **That problem does not apply here — do not port that patch machinery.**
-`ElectricalPowerMeasurement` uses esp_matter's Delegate/Instance pattern
-(`PlugPowerDelegate` in `main/power_measurement.cpp`), which self-registers
-correctly. `ElectricalEnergyMeasurement` in this esp_matter version (1.6.0)
-is registered by adding the cluster via
+
+Both measurement clusters register the same way in this esp_matter version
+(1.6.0), and neither self-registers. **A CHIP `Instance` is not enough on its
+own**: constructing one and calling `Init()` registers an
+`AttributeAccessInterface`, but without a matching esp_matter `cluster_t` the
+endpoint's descriptor never advertises the cluster, so no controller ever
+discovers or subscribes to it — and nothing errors. This firmware shipped with
+exactly that bug: EPM had an `Instance` but no
+`cluster::electrical_power_measurement::create()` call, and reported no
+wattage while logging nothing wrong. `PowerMeasurementInit()`'s
+`kRequiredServerClusters` loop now fails loudly on that.
+
+`ElectricalPowerMeasurement` is created by
+`esp_matter::cluster::electrical_power_measurement::create()` with
+`PlugPowerDelegate` (`main/power_measurement.cpp`) passed as
+`config_t::delegate`. That delegate pointer is what arms
+`ElectricalPowerMeasurementDelegateInitCB`, which constructs the CHIP
+`Instance`, calls `Init()` on it, and owns its lifetime via a shutdown
+callback — so `power_measurement.cpp` must **not** construct an `Instance`
+itself (two would double-register the same `AttributeAccessInterface`), and
+the delegate has static storage so it outlives `create_endpoints()`. The
+cluster's optional-attribute set is derived from which optional attributes
+actually exist on it, so declaring exactly `rms_voltage` and `rms_current` is
+how this endpoint says "AC RMS, nothing else" — matching the Zephyr sibling's
+`.matter`, and matching the delegate's non-null getters.
+
+`ElectricalEnergyMeasurement` is registered by adding the cluster via
 `esp_matter::cluster::electrical_energy_measurement::create()`
 (`main/matter_setup.cpp`'s `create_endpoints()`), which triggers an
 esp_matter-owned init callback
@@ -105,7 +128,10 @@ which this esp_matter build doesn't even compile CHIP's own
 If bumping `espressif/esp_matter` past 1.6.0 ever reintroduces that
 constructor, `PowerMeasurementInit()`'s `GetClusterInstance() == nullptr`
 check will fail loudly with a clear log line, not silently drop energy
-reports — check there first.
+reports — check there first. That check is deliberately separate from the
+`kRequiredServerClusters` loop above it: the loop proves esp_matter's
+`cluster_t` exists, while `GetClusterInstance()` proves the init callback
+actually built the CHIP cluster behind it.
 
 ## Calibration — unverified for this unit
 
@@ -145,6 +171,14 @@ GUI or hand-maintained `.matter`/`.zap` file to keep in sync — esp_matter
 builds the data model programmatically from the `config_t` structs and
 `cluster::*::create()` calls in `matter_setup.cpp`.
 
+Those `create()` calls *are* the data model: a cluster with no call is absent
+from the endpoint's descriptor no matter what app code does with it (see the
+EPM bug above). When adding a cluster here, add its id to
+`kRequiredServerClusters` in `main/power_measurement.cpp` too, so a forgotten
+`create()` fails at boot instead of silently reporting nothing. The Zephyr
+sibling's `src/default_zap/smart_plug.matter` is the reference for what this
+endpoint should advertise.
+
 Transport is **Matter over Thread**, FTD (always-on, no ICD/sleep) — see
 `sdkconfig.defaults`'s comment for why this differs from the nRF sibling's
 MTD+ICD choice. Requires a Thread Border Router on the network to commission.
@@ -164,10 +198,16 @@ own job rather than time-sharing one (see `main/status_led.h`):
   where the relay coil (mains-derived rail) will not physically click, so the
   LED is the only confirmation a controller toggle landed.
 
-The plug's own front-panel LED (`PIN_LED`) still carries network state too, and
-is the only one of the three visible once the enclosure is closed. A third
-onboard LED, the battery-charge indicator, is wired to the charger IC and has
-no GPIO.
+The plug's own front-panel LED (`PIN_LED`) is the only one of the three visible
+once the enclosure is closed, so it shows different things in different phases:
+solid through boot, blinking while the commissioning window is open, and
+**following the relay once paired** (on when the load is on), the way a mains
+plug's own indicator behaves. Error takes it back — dark plug LED plus red RGB
+— so a relay that happens to be on cannot mask the error cue. `status_led.cpp`
+derives the handover from the current state (`RelayOwnsPlugLed()`) rather than
+latching it separately, and reads relay state from `RelayIsOn()` rather than
+keeping its own copy. A third onboard LED, the battery-charge indicator, is
+wired to the charger IC and has no GPIO.
 
 There is **no RF antenna switch** on this board — single PCB trace antenna, no
 U.FL, and no switch-control GPIOs. There is nothing to select in software, so
