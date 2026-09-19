@@ -24,12 +24,12 @@
 
 #define CHIP_DEVICE_CONFIG_USE_TEST_SETUP_DISCRIMINATOR 0x822
 
-#define CHIP_DEVICE_CONFIG_USE_TEST_SETUP_PIN_CODE 29312364
+#define CHIP_DEVICE_CONFIG_USE_TEST_SETUP_PIN_CODE 27443561
 
-// Generated with: python3 tools/spake2p_verifier.py 29312364
+// Generated with: python3 tools/spake2p_verifier.py 27443561
 #define CHIP_DEVICE_CONFIG_USE_TEST_SPAKE2P_VERIFIER                        \
-    "0HGrh3Zl3Hqo7xjTalRvPf1xx3Q7/jPD/Yqmus0nTYMEW8Vhui1Ni6TwaB5empEA07Taf+" \
-    "7cU79LPxyryUuYYrq/8VZBys3sxZvJC95QLlPTTPxNgZjVBoGdPrzhIxkXzA=="
+    "rhBjDXScL5lRJ8SfKxFFQmObnLEI6hCpL2YcP+Y4AkEEh8jM30eNTwVTEQaj7hsRnWlyh/" \
+    "Vdjme1YccwqrTB+Q2qk0Nvf08M01qZFJbZf8qmVSNG36npetqX/SsUGuUXbg=="
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Basic Information cluster identity, shown by controllers (e.g. Home
