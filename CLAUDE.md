@@ -30,7 +30,7 @@ The firmware is a **port**, not a from-scratch build. Its two ancestors:
 ## Build
 
 ```sh
-source ~/.espressif/v6.0.3/esp-idf/export.sh
+source ~/.espressif/v6.1/esp-idf/export.sh
 idf.py set-target esp32h2
 idf.py build
 idf.py flash monitor
@@ -46,6 +46,41 @@ Give this device its own pairing code before flashing (see
 ```sh
 python3 tools/spake2p_verifier.py <passcode>
 ```
+
+## CI
+
+`.github/workflows/build.yaml` builds the firmware on every PR and on pushes
+to `main`, using `espressif/esp-idf-ci-action` with the **same ESP-IDF version
+this project pins locally (`v6.1`)**. There is no flash or hardware stage —
+CI proves the tree compiles and links for `esp32h2`, nothing more. Everything
+this firmware actually needs a bench for (calibration, SEL polarity, real
+power readings) is listed under "Calibration" below and in README.md's
+Verification checklist; a green check here says nothing about those.
+
+Three things about this workflow are deliberate and worth not "fixing":
+
+- **Path filters.** The workflow only runs when `main/`, `CMakeLists.txt`,
+  `sdkconfig.defaults`, `partitions.csv`, or the workflow file itself change.
+  A Matter build takes minutes; README and `doc/` edits do not need one. If
+  you add a new build input at the repo root, add it to *both* the
+  `pull_request` and `push` path lists.
+- **ccache across the container boundary.** The IDF build runs in a Docker
+  container, so the host ccache dir is bind-mounted to `/root/.ccache` via
+  `extra_docker_args` and re-owned afterwards by the "Fix cache permissions"
+  step — the container writes as root, and without that `chown` the post-job
+  cache save silently fails. The cache key is pinned to the IDF version
+  (`esp32h2-v6.1`), so a toolchain bump starts a fresh cache instead of
+  reusing objects built by the old compiler.
+- **`managed_components/` is cached** on `dependencies.lock` +
+  `main/idf_component.yml`, which keeps esp_matter (a large download) out of
+  the critical path when dependencies have not moved.
+
+When bumping ESP-IDF, four places must change together, or CI and the bench
+drift apart: `main/idf_component.yml`'s `idf:` range, the workflow's
+`esp_idf_version:` **and** its ccache `key:`, CLAUDE.md's `export.sh` path
+above, and `.vscode/settings.json`'s `idf.currentSetup`. Dependencies
+themselves are bumped by Renovate (`renovate.json`, monthly, non-major
+automerged) — it does not know about the IDF pin, so that one is manual.
 
 ## Hardware — pin roles are NOT the same as the sibling project
 
